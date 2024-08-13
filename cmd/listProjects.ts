@@ -20,7 +20,6 @@ const GitHubToken = process.env.GH_TOKEN;
  */
 const listProjects = async () => {
   const projects = await listConfigProjects();
-  console.log('Projects:', projects);
   if (projects?.length === 0 || !projects) {
     console.log(
       chalk.whiteBright.bgRed.bold('No projects found. Create a new project.'),

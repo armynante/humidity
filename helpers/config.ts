@@ -3,11 +3,15 @@ import type {
   Config,
   NewProjectQuestions,
   Project,
+  RequiredEnvs,
   RequiredEnvsSet,
 } from '../types/config';
-import { join } from 'node:path';
+import path, { join } from 'node:path';
 import { randomUUID } from 'node:crypto';
 import Bun from 'bun';
+import fs from 'node:fs/promises';
+import os from 'node:os';
+import * as dotenv from 'dotenv';
 
 /**
  * Initializes a blank config object
@@ -21,6 +25,17 @@ export const initializeConfig = (): Config => {
 };
 
 /**
+ * Loads the config file from the .env file
+ * @param envPath The path to the .env file
+ *
+ */
+export const loadConfigFromEnv = async (envPath: string): Promise<void> => {
+  const resolvedPath = envPath.replace('~', os.homedir());
+  const absolutePath = path.resolve(resolvedPath);
+  dotenv.config({ path: absolutePath });
+};
+
+/**
  * Checks if the config file exists
  * @returns {Promise<Config | false>} The config file or false if it doesn't exist
  */
@@ -31,6 +46,31 @@ export const checkConfigExists = async (): Promise<Config | false> => {
     return file.json();
   } else {
     return false;
+  }
+};
+
+/**
+ * Build the .env.humidity file
+ * @param envPath The path to the .env.humidity file
+ * @param envs The environment variables to write
+ * @returns {Promise<void>}
+ */
+export const buildEnvFile = async (
+  envPath: string,
+  envs: RequiredEnvs,
+): Promise<void> => {
+  try {
+    const exampleEnvPath = join(
+      __dirname,
+      '../templates/.env.humidity.example',
+    );
+    const resolvedPath = envPath.replace('~', os.homedir());
+    const absolutePath = path.resolve(resolvedPath);
+    // create the .env file using the envs object using node fs
+    const envFile = `GH_USERNAME=${envs.GH_USERNAME}\nGH_TOKEN=${envs.GH_TOKEN}\nDO_REGISTRY_NAME=${envs.DO_REGISTRY_NAME}\nDO_API_TOKEN=${envs.DO_API_TOKEN}`;
+    await fs.writeFile(absolutePath, envFile);
+  } catch (error) {
+    console.error(error);
   }
 };
 
