@@ -11,12 +11,13 @@ import {
   createDoApp,
   createDoAppSpec,
   pollDoAppStatus,
+  writeDoAppSpec,
 } from '../helpers/digitalOcean';
 import type { GHSecret, NewProjectQuestions } from '../types/config';
 import ora from 'ora';
 import { projectTable } from '../helpers/transformers';
-import process from 'node:process';
-import Bun from 'bun';
+import { runCommand } from '../helpers/io';
+import fs from 'node:fs/promises';
 
 const GitHubToken = process.env.GH_TOKEN;
 
@@ -24,7 +25,7 @@ const createProject = async () => {
   // Ask what the user wants to do
   // Create a new TS Project
 
-  const p: NewProjectQuestions = {
+  let p: NewProjectQuestions = {
     name: '',
     projectPath: '',
     description: '',
@@ -35,6 +36,9 @@ const createProject = async () => {
     createGHAction: false,
     createDoApp: false,
     projectType: null,
+    buildTool: null,
+    prettier: false,
+    eslint: false,
   };
 
   // Get the current working directory
@@ -48,6 +52,23 @@ const createProject = async () => {
       { name: 'Go Fiber server', value: 'go_fiber' },
     ],
   });
+  if (p.projectType === 'ts_express') {
+    p.buildTool = await select({
+      message: 'Choose a build tool',
+      choices: [
+        { name: 'pnpm', value: 'pnpm' },
+        { name: 'yarn', value: 'yarn' },
+        { name: 'npm', value: 'npm' },
+      ],
+    });
+    p.prettier = await confirm({
+      message: 'Do you want to use Prettier?',
+    });
+    p.eslint = await confirm({
+      message: 'Do you want to use ESLint?',
+    });
+  }
+
   p.name = await input({
     message: 'Enter the name of your project in dashed case',
     required: true,
@@ -109,6 +130,9 @@ const createProject = async () => {
       getColor(project.createGHAction)(project.createGHAction.toString()),
       getColor(project.createDoApp)(project.createDoApp.toString()),
       project.projectType,
+      project.buildTool,
+      project.prettier,
+      project.eslint,
     ];
 
     const maxLength = labels.reduce(
@@ -162,25 +186,54 @@ const createProject = async () => {
   // copy sampleTSProject to the project directory
   if (p.projectType === 'ts_express') {
     const fileSpinner = ora('Copying files to project directory').start();
-    const docker = Bun.file('./sampleTSProject/Dockerfile');
-    const ignore = Bun.file('./sampleTSProject/.gitignore');
-    const src = Bun.file('./sampleTSProject/bundle.mjs');
-    const tsconfig = Bun.file('./sampleTSProject/tsconfig.json');
-    await Bun.write(`${p.projectPath}/Dockerfile`, docker);
-    await Bun.write(`${p.projectPath}/.gitignore`, ignore);
-    await Bun.write(`${p.projectPath}/bundle.mjs`, src);
-    await Bun.write(`${p.projectPath}/tsconfig.json`, tsconfig);
-    fileSpinner.succeed('Files copied to project directory');
+    try {
+      const docker = await fs.readFile('./sampleTSProject/Dockerfile');
+      const ignore = await fs.readFile('./sampleTSProject/.gitignore');
+      const src = await fs.readFile('./sampleTSProject/bundle.mjs');
+      const tsconfig = await fs.readFile('./sampleTSProject/tsconfig.json');
+      const editorconfig = await fs.readFile('./sampleTSProject/.editorconfig');
+
+      await fs.writeFile(`${p.projectPath}/Dockerfile`, docker);
+      await fs.writeFile(`${p.projectPath}/.gitignore`, ignore);
+      await fs.writeFile(`${p.projectPath}/bundle.mjs`, src);
+      await fs.writeFile(`${p.projectPath}/tsconfig.json`, tsconfig);
+      await fs.writeFile(`${p.projectPath}/.editorconfig`, editorconfig);
+
+      if (p.prettier) {
+        const prettier = await fs.readFile('./sampleTSProject/.prettierrc');
+        const prettierignore = await fs.readFile(
+          './sampleTSProject/.prettierignore',
+        );
+        await fs.writeFile(`${p.projectPath}/.prettierrc`, prettier);
+        await fs.writeFile(`${p.projectPath}/.prettierignore`, prettierignore);
+      }
+
+      if (p.eslint) {
+        const eslint = await fs.readFile('./sampleTSProject/eslint.config.js');
+        const eslintignore = await fs.readFile(
+          './sampleTSProject/.eslintignore',
+        );
+        await fs.writeFile(`${p.projectPath}/.eslint.config.js`, eslint);
+        await fs.writeFile(`${p.projectPath}/.eslintignore`, eslintignore);
+      }
+
+      fileSpinner.succeed('Files copied to project directory');
+    } catch (error) {
+      fileSpinner.fail('Failed to copy files to project directory');
+      console.error(error);
+    }
+  }
+  // Initialize the project with the build tool
+  if (p.buildTool) {
+    const buildSpinner = ora('Initializing project').start();
+    await runCommand(p.buildTool, ['init'], p.projectPath);
+    buildSpinner.succeed('Project initialized');
   }
 
   // Create the Git repository
   if (p.createGitRepo) {
     const gitRepoSpinner = ora('Creating Git repository').start();
-    const proc = Bun.spawn(['git', 'init'], {
-      cwd: p.projectPath,
-    });
-    const output = await Bun.readableStreamToText(proc.stdout);
-    gitRepoSpinner.text = output;
+    await runCommand('git', ['init'], p.projectPath);
     gitRepoSpinner.succeed('Git repository created');
   }
 
@@ -188,7 +241,7 @@ const createProject = async () => {
   if (p.createReadme) {
     const readme = `# ${p.name}\n\n${p.description}`;
     const readmeSpinner = ora('Creating README.md').start();
-    await Bun.write(`${p.projectPath}/README.md`, readme);
+    await fs.writeFile(`${p.projectPath}/README.md`, readme);
     readmeSpinner.succeed('README.md created');
   }
 
@@ -198,7 +251,12 @@ const createProject = async () => {
       console.error(chalk.redBright.bold('GitHub token not found'));
       return;
     }
-    const GH = new GitHub(GitHubToken, 'armynante');
+    const GH_USERNAME = process.env.GH_USERNAME;
+    if (!GH_USERNAME) {
+      console.error(chalk.redBright.bold('GitHub username not found'));
+      return;
+    }
+    const GH = new GitHub(GitHubToken, GH_USERNAME);
     const ghRepoSpinner = ora('Creating GitHub repository').start();
     const { data: repo } = await GH.createRepo(p.name);
     ghRepoSpinner.succeed(`GitHub repository created: ${repo.html_url}`);
@@ -212,7 +270,12 @@ const createProject = async () => {
       const actionSpinner = ora('Creating GitHub action workflow').start();
       const mainYml = GH.makeGhActionFile();
       actionSpinner.text = `Writing GitHub action workflow to ${p.projectPath}/.github/workflows/main.yml`;
-      await Bun.write(`${p.projectPath}/.github/workflows/main.yml`, mainYml);
+      // create the .github/workflows directory
+      await mkdir(`${p.projectPath}/.github/workflows`, { recursive: true });
+      await fs.writeFile(
+        `${p.projectPath}/.github/workflows/main.yml`,
+        mainYml,
+      );
 
       // Add DO_REGISTRY_USERNAME and DO_REGISTRY_TOKEN to the repo secrets
       actionSpinner.text = 'Adding DigitalOcean registry secrets';
@@ -244,32 +307,28 @@ const createProject = async () => {
 
       // Add the remote
       actionSpinner.text = 'Adding GitHub remote';
-      const procZero = Bun.spawn(
-        ['git', 'remote', 'add', 'origin', repo.html_url],
-        {
-          cwd: p.projectPath,
-        },
+
+      await runCommand(
+        'git',
+        ['remote', 'add', 'origin', repo.html_url],
+        p.projectPath,
       );
-      actionSpinner.text = await Bun.readableStreamToText(procZero.stdout);
 
       // Commit the changes
-      actionSpinner.text = 'Committing changes';
-      const proc = Bun.spawn(['git', 'add', '.'], {
-        cwd: p.projectPath,
-      });
+      actionSpinner.text = 'Adding files to commit';
+      await runCommand('git', ['add', '.'], p.projectPath);
 
-      actionSpinner.text = await Bun.readableStreamToText(proc.stdout);
       actionSpinner.text = 'Committing changes';
-      const proc2 = Bun.spawn(['git', 'commit', '-m', '"Initial commit"'], {
-        cwd: p.projectPath,
-      });
-      actionSpinner.text = await Bun.readableStreamToText(proc2.stdout);
+
+      await runCommand(
+        'git',
+        ['commit', '-m', '"Initial commit"'],
+        p.projectPath,
+      );
 
       actionSpinner.text = 'Pushing changes';
-      const proc3 = Bun.spawn(['git', 'push', '-u', 'origin', 'main'], {
-        cwd: p.projectPath,
-      });
-      actionSpinner.text = await Bun.readableStreamToText(proc3.stdout);
+
+      await runCommand('git', ['push', '-u', 'origin', 'main'], p.projectPath);
       actionSpinner.succeed('GitHub action workflow created and pushed');
     }
   }
@@ -278,57 +337,54 @@ const createProject = async () => {
   if (p.createDoApp) {
     const doAppSpinner = ora('Creating DigitalOcean App').start();
     // build the image
-    const proc = Bun.spawn(
+    await runCommand(
+      'docker',
       [
-        'docker',
         'build',
         '-t',
         `registry.digitalocean.com/humidresearch/${p.name}:latest`,
         '.',
       ],
-      {
-        cwd: p.projectPath,
-      },
+      p.projectPath,
     );
-    doAppSpinner.text = await Bun.readableStreamToText(proc.stdout);
     doAppSpinner.text = 'Built Docker image';
 
     // push the image
     doAppSpinner.text = 'Pushing Docker image';
-    const proc2 = Bun.spawn(
+    const DO_REGISTRY_NAME = process.env.DO_REGISTRY_NAME;
+    if (!DO_REGISTRY_NAME) {
+      console.error('DigitalOcean registry name not found');
+      return;
+    }
+    await runCommand(
+      'docker',
       [
-        'docker',
         'push',
-        `registry.digitalocean.com/humidresearch/${p.name}:latest`,
+        `registry.digitalocean.com/${DO_REGISTRY_NAME}/${p.name}:latest`,
       ],
-      {
-        cwd: p.projectPath,
-      },
+      p.projectPath,
     );
-    doAppSpinner.text = await Bun.readableStreamToText(proc2.stdout);
     doAppSpinner.text = 'Pushed Docker image';
 
     // Create the DO App spec
     doAppSpinner.text = 'Creating DO App spec';
     const spec = createDoAppSpec(p.name, 3000, 'latest', p.name);
     doAppSpinner.text = 'Writing DO App spec';
-    await Bun.write(
-      `${p.projectPath}/${p.name}.spec.yaml`,
-      JSON.stringify(spec, null, 2),
-    );
+    await writeDoAppSpec(p.name, spec, p.projectPath);
     doAppSpinner.text = 'Creating the DO App. Waiting for response...';
     const specResp = await createDoApp(spec);
-
     // Poll the DO API for the status of the app for the link
     const appStatus = await pollDoAppStatus(specResp.app.id, 5000);
     doAppSpinner.text = 'Created DO App. Writing config...';
 
     // Write the DO config to a file
-    await Bun.write(
+    await fs.writeFile(
       `${p.projectPath}/do-config.json`,
       JSON.stringify(appStatus, null, 2),
     );
-    doAppSpinner.succeed(`Created DigitalOcean App: ${appStatus.app.live_url}`);
+    doAppSpinner.succeed(
+      `Created DigitalOcean App: ${appStatus?.app?.live_url}`,
+    );
     // Update the project
     const updateSpinner = ora('Updating project').start();
     await updateProject(newProject.id, {

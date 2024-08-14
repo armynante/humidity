@@ -1,7 +1,8 @@
-import axios, {AxiosError, type AxiosResponse } from 'axios';
+import axios, { AxiosError, type AxiosResponse } from 'axios';
 import type { DoAppSpec } from '../types/do';
-import Bun from 'bun';
 import process from 'node:process';
+import { runCommand } from './io';
+import fs from 'node:fs/promises';
 
 /**
  * Builds a Docker image
@@ -9,12 +10,19 @@ import process from 'node:process';
  * @param tag The tag of the image. Usually 'latest'.
  * @param dockerfile The path to the Dockerfile
  */
-export const buildImage = async (imageName: string, tag: string, dockerfile: string) => {
-    const proc = Bun.spawn(
-        ['docker','build','-t',`${imageName}:${tag}`, '-f', dockerfile, '.']
-    );
-    const output = await new Response(proc.stdout).text();
-    return output;
+export const buildImage = async (
+  imageName: string,
+  tag: string,
+  dockerfile: string,
+) => {
+  await runCommand('docker', [
+    'build',
+    '-t',
+    `${imageName}:${tag}`,
+    '-f',
+    dockerfile,
+    '.',
+  ]);
 };
 
 /**
@@ -24,13 +32,8 @@ export const buildImage = async (imageName: string, tag: string, dockerfile: str
  * @returns {Promise<string>} The output of the push command
  */
 export const pushImage = async (imageName: string, tag: string) => {
-    const proc = Bun.spawn(
-        ['docker','push',`${imageName}:${tag}`]
-    );
-    const output = await new Response(proc.stdout).text();
-    return output;
+  await runCommand('docker', ['push', `${imageName}:${tag}`]);
 };
-
 
 /**
  * Create a DigitalOcean App spec
@@ -41,7 +44,12 @@ export const pushImage = async (imageName: string, tag: string) => {
  * @returns {DoAppSpec} The app spec
  * @example createDoAppSpec('my-app', 3000, 'latest', 'my-app')
  */
-export const createDoAppSpec = (appName: string, port: number, tag: string, repository: string):DoAppSpec => {
+export const createDoAppSpec = (
+  appName: string,
+  port: number,
+  tag: string,
+  repository: string,
+): DoAppSpec => {
   return {
     name: appName,
     region: 'nyc',
@@ -49,16 +57,16 @@ export const createDoAppSpec = (appName: string, port: number, tag: string, repo
     ingress: {
       rules: [
         {
-          component: { 
+          component: {
             name: appName,
           },
           match: {
             path: {
               prefix: '/',
-            }
-          }
-        }
-      ]
+            },
+          },
+        },
+      ],
     },
     services: [
       {
@@ -70,7 +78,7 @@ export const createDoAppSpec = (appName: string, port: number, tag: string, repo
           tag: tag,
           deploy_on_push: {
             enabled: true,
-          }
+          },
         },
         instance_count: 1,
         instance_size_slug: 'apps-s-1vcpu-0.5gb',
@@ -85,12 +93,19 @@ export const createDoAppSpec = (appName: string, port: number, tag: string, repo
  * @param appSpec The app spec to write
  * @returns {Promise<string | void>} An error message or void
  */
-export const writeDoAppSpec = async (appName: string, appSpec: DoAppSpec):Promise<string | void> => {
+export const writeDoAppSpec = async (
+  appName: string,
+  appSpec: DoAppSpec,
+  path: string,
+): Promise<string | void> => {
   try {
-    await Bun.write(`${appName}.spec.yaml`, JSON.stringify(appSpec, null, 2));
+    await fs.writeFile(
+      `${path}/${appName}.do-app-spec.yaml`,
+      JSON.stringify(appSpec, null, 2),
+    );
   } catch (error) {
     console.error(error);
-    return "An error occurred writing the spec file";
+    return 'An error occurred writing the spec file';
   }
 };
 
@@ -99,15 +114,19 @@ export const writeDoAppSpec = async (appName: string, appSpec: DoAppSpec):Promis
  * @param spec {DoAppSpec} The app spec
  * @returns {Promise<any>} The app object
  */
-export const createDoApp = async (spec: DoAppSpec ) => {
+export const createDoApp = async (spec: DoAppSpec) => {
   try {
-    const slug = { spec};
-    const response = await axios.post('https://api.digitalocean.com/v2/apps', slug, {
-      headers: {
-        'Authorization': `Bearer ${process.env.DO_API_TOKEN}`,
-        'Content-Type': 'application/json',
+    const slug = { spec };
+    const response = await axios.post(
+      'https://api.digitalocean.com/v2/apps',
+      slug,
+      {
+        headers: {
+          Authorization: `Bearer ${process.env.DO_API_TOKEN}`,
+          'Content-Type': 'application/json',
+        },
       },
-    });
+    );
     return response.data;
   } catch (error) {
     console.error(error);
@@ -124,11 +143,14 @@ export const createDoApp = async (spec: DoAppSpec ) => {
 export const pollDoAppStatus = async (appId: string, pollPeriod: number) => {
   const poll = async () => {
     try {
-      const response = await axios.get(`https://api.digitalocean.com/v2/apps/${appId}`, {
-        headers: {
-          'Authorization': `Bearer ${process.env.DO_API_TOKEN}`,
+      const response = await axios.get(
+        `https://api.digitalocean.com/v2/apps/${appId}`,
+        {
+          headers: {
+            Authorization: `Bearer ${process.env.DO_API_TOKEN}`,
+          },
         },
-      });
+      );
       return response.data;
     } catch (error) {
       console.error(error);
@@ -137,7 +159,7 @@ export const pollDoAppStatus = async (appId: string, pollPeriod: number) => {
   };
   let status = await poll();
   while (status && status.app && !status.app?.live_url) {
-    await new Promise(resolve => setTimeout(resolve, pollPeriod));
+    await new Promise((resolve) => setTimeout(resolve, pollPeriod));
     status = await poll();
   }
   return status;
@@ -148,13 +170,18 @@ export const pollDoAppStatus = async (appId: string, pollPeriod: number) => {
  * @param appId The ID of the app to delete
  * @returns {Promise<[AxiosResponse["data"] | null, string | null]>} The response data or an error message
  */
-export const deleteDoApp = async (appId: string): Promise<[AxiosResponse["data"] | null, string | null]> => {
+export const deleteDoApp = async (
+  appId: string,
+): Promise<[AxiosResponse['data'] | null, string | null]> => {
   try {
-    const { data } = await axios.delete(`https://api.digitalocean.com/v2/apps/${appId}`, {
-      headers: {
-        'Authorization': `Bearer ${process.env.DO_API_TOKEN}`,
+    const { data } = await axios.delete(
+      `https://api.digitalocean.com/v2/apps/${appId}`,
+      {
+        headers: {
+          Authorization: `Bearer ${process.env.DO_API_TOKEN}`,
+        },
       },
-    });
+    );
     return [data, null];
   } catch (error) {
     if (error instanceof AxiosError) {
@@ -166,13 +193,19 @@ export const deleteDoApp = async (appId: string): Promise<[AxiosResponse["data"]
 };
 
 // Delete DO Registry Repository
-export const getRepoManifests = async (repository: string, registry: string): Promise<[AxiosResponse["data"] | null, string | null]> => {
+export const getRepoManifests = async (
+  repository: string,
+  registry: string,
+): Promise<[AxiosResponse['data'] | null, string | null]> => {
   try {
-    const { data } = await axios.get(`https://api.digitalocean.com/v2/registry/${registry}/repositories/${repository}/digests`, {
-      headers: {
-        'Authorization': `Bearer ${process.env.DO_API_TOKEN}`,
+    const { data } = await axios.get(
+      `https://api.digitalocean.com/v2/registry/${registry}/repositories/${repository}/digests`,
+      {
+        headers: {
+          Authorization: `Bearer ${process.env.DO_API_TOKEN}`,
+        },
       },
-    });
+    );
     const manifests = data.manifests.map((manifest: Record<string, string>) => {
       return manifest.digest;
     });
@@ -187,13 +220,20 @@ export const getRepoManifests = async (repository: string, registry: string): Pr
 };
 
 // Delete DO Registry Repository by digest
-export const deleteDoManifest = async (repository: string, registry: string, sha:string): Promise<[AxiosResponse["data"] | null, string | null]> => {
+export const deleteDoManifest = async (
+  repository: string,
+  registry: string,
+  sha: string,
+): Promise<[AxiosResponse['data'] | null, string | null]> => {
   try {
-    const { data } = await axios.delete(`https://api.digitalocean.com/v2/registry/${registry}/repositories/${repository}/digests/${sha}`, {
-      headers: {
-        'Authorization': `Bearer ${process.env.DO_API_TOKEN}`,
+    const { data } = await axios.delete(
+      `https://api.digitalocean.com/v2/registry/${registry}/repositories/${repository}/digests/${sha}`,
+      {
+        headers: {
+          Authorization: `Bearer ${process.env.DO_API_TOKEN}`,
+        },
       },
-    });
+    );
     return [data, null];
   } catch (error) {
     if (error instanceof AxiosError) {
@@ -205,7 +245,10 @@ export const deleteDoManifest = async (repository: string, registry: string, sha
 };
 
 // loop through the manifests and delete them
-export const deleteDoRegistryRepo = async (repository: string, registry: string): Promise<[AxiosResponse["data"] | null, string | null]> => {
+export const deleteDoRegistryRepo = async (
+  repository: string,
+  registry: string,
+): Promise<[AxiosResponse['data'] | null, string | null]> => {
   const [manifests, err] = await getRepoManifests(repository, registry);
   if (err) {
     return [null, err];
@@ -219,18 +262,19 @@ export const deleteDoRegistryRepo = async (repository: string, registry: string)
   return [manifests, null];
 };
 
-
-
-
-
 //run garbage collection on the DO registry
-export const doGarbageCollection = async (registry:string): Promise<[AxiosResponse["data"] | null, string | null]> => {
+export const doGarbageCollection = async (
+  registry: string,
+): Promise<[AxiosResponse['data'] | null, string | null]> => {
   try {
-    const { data } = await axios.post(`https://api.digitalocean.com/v2/registry/${registry}/garbage-collection`, {
-      headers: {
-        'Authorization': `Bearer ${process.env.DO_API_TOKEN}`,
+    const { data } = await axios.post(
+      `https://api.digitalocean.com/v2/registry/${registry}/garbage-collection`,
+      {
+        headers: {
+          Authorization: `Bearer ${process.env.DO_API_TOKEN}`,
+        },
       },
-    });
+    );
     return [data, null];
   } catch (error) {
     if (error instanceof AxiosError) {

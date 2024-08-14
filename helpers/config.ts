@@ -8,7 +8,6 @@ import type {
 } from '../types/config';
 import path, { join } from 'node:path';
 import { randomUUID } from 'node:crypto';
-import Bun from 'bun';
 import fs from 'node:fs/promises';
 import os from 'node:os';
 import * as dotenv from 'dotenv';
@@ -84,8 +83,8 @@ export const buildEnvFile = async (
 export const validateEnvFile = async (
   envPath: string,
 ): Promise<[boolean, RequiredEnvsSet]> => {
-  const envFile = Bun.file(envPath);
-  if (!(await envFile.exists())) {
+  const envFile = await fs.exists(envPath);
+  if (!envFile) {
     throw new Error('Env file does not exist');
   }
   let missingEnvSet: RequiredEnvsSet = {
@@ -94,7 +93,7 @@ export const validateEnvFile = async (
     DO_REGISTRY_NAME: true,
     DO_API_TOKEN: true,
   };
-  const envs = await envFile.json();
+  const envs = dotenv.parse(await fs.readFile(envPath));
   const missingEnvs = Object.keys(missingEnvSet).filter(
     (env) => !envs[env],
   ) as (keyof RequiredEnvsSet)[];
@@ -112,13 +111,13 @@ export const validateEnvFile = async (
  */
 export const createConfig = async (): Promise<Config> => {
   const filePath = join(homedir(), '.humidity/config.json');
-  const file = Bun.file(filePath);
-  if (await file.exists()) {
+  const exists = await fs.exists(filePath);
+  if (!exists) {
     throw new Error('Config file already exists');
   }
   console.log('Writing config...');
   const config = initializeConfig();
-  await Bun.write(filePath, JSON.stringify(config, null, 2));
+  await fs.writeFile(filePath, JSON.stringify(config, null, 2));
   console.log(`Config created at ${filePath}`);
   return config;
 };
@@ -154,7 +153,7 @@ export const createNewProject = async (
   config.projects.push(newProject);
   // write the config
   const filePath = join(homedir(), '.humidity/config.json');
-  await Bun.write(filePath, JSON.stringify(config, null, 2));
+  await fs.writeFile(filePath, JSON.stringify(config, null, 2));
   return newProject;
 };
 
@@ -182,7 +181,7 @@ export const updateProject = async (
   Object.assign(project, updates);
   // write the config
   const filePath = join(homedir(), '.humidity/config.json');
-  await Bun.write(filePath, JSON.stringify(config, null, 2));
+  await fs.writeFile(filePath, JSON.stringify(config, null, 2));
   return project;
 };
 
@@ -208,7 +207,7 @@ export const updateConfig = async (
   Object.assign(config, updates);
   // write the config
   const filePath = join(homedir(), '.humidity/config.json');
-  await Bun.write(filePath, JSON.stringify(config, null, 2));
+  await fs.writeFile(filePath, JSON.stringify(config, null, 2));
   return [config, error];
 };
 
@@ -257,5 +256,5 @@ export const deleteProject = async (projectId: string) => {
   config.projects.splice(projectIndex, 1);
   // write the config
   const filePath = join(homedir(), '.humidity/config.json');
-  await Bun.write(filePath, JSON.stringify(config, null, 2));
+  await fs.writeFile(filePath, JSON.stringify(config, null, 2));
 };

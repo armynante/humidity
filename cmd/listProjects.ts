@@ -89,47 +89,53 @@ const listProjects = async () => {
         if (archive) {
           if (!GitHubToken) {
             console.error('GitHub token not found');
-            return;
+          } else {
+            const GH_USERNAME = process.env.GH_USERNAME;
+            if (!GH_USERNAME) {
+              console.error('GitHub username not found');
+            } else {
+              const GH = new GitHub(GitHubToken, GH_USERNAME);
+              await GH.delete(project.name);
+              console.log('GitHub repository deleted');
+            }
           }
-          const GH = new GitHub(GitHubToken, 'armynante');
-
-          await GH.delete(project.name);
-          console.log('GitHub repository deleted');
         }
       }
 
       // delete the DigitalOcean App if it exists
-      if (project.do_app_id) {
+      if (project.do_app_id !== '' && project.do_app_id !== undefined) {
         const confDeleteDoApp = await confirm({
           message: 'Delete the DigitalOcean App?',
         });
-        if (!confDeleteDoApp) {
-          return;
+        if (confDeleteDoApp) {
+          const [, err] = await deleteDoApp(project.do_app_id);
+          if (err) {
+            console.error(err);
+            return;
+          }
+          console.log('DigitalOcean App deleted');
         }
-        const [, err] = await deleteDoApp(project.do_app_id);
-        if (err) {
-          console.error(err);
-          return;
-        }
-        console.log('DigitalOcean App deleted');
-      }
 
-      //delete the DO registry repository
-      const deleteDoRegistry = await confirm({
-        message: 'Delete the DigitalOcean Registry repository?',
-      });
-      if (deleteDoRegistry) {
-        console.log('Deleting DigitalOcean Registry repository...');
-        // delete the repository
-        const registry = process.env.DO_REGISTRY_NAME as string;
-        if (!registry) {
-          console.error('DO Registry name not found');
+        //delete the DO registry repository
+        const deleteDoRegistry = await confirm({
+          message: 'Delete the DigitalOcean Registry repository?',
+        });
+
+        if (deleteDoRegistry) {
+          console.log('Deleting DigitalOcean Registry repository...');
+          // delete the repository
+          const registry = process.env.DO_REGISTRY_NAME as string;
+          if (!registry) {
+            console.error('DO Registry name not found');
+          } else {
+            const [, e] = await deleteDoRegistryRepo(project.name, registry);
+            if (e) {
+              console.error(e);
+            } else {
+              console.log('DigitalOcean Registry repository deleted');
+            }
+          }
         }
-        const [, e] = await deleteDoRegistryRepo(project.name, registry);
-        if (e) {
-          console.error(e);
-        }
-        console.log('DigitalOcean Registry repository deleted');
       }
 
       const deleteProjectDir = await confirm({
@@ -142,6 +148,8 @@ const listProjects = async () => {
       }
 
       await deleteProject(selectedProject);
+      exit(0);
+
       break;
     }
     case 'exit':
@@ -150,6 +158,7 @@ const listProjects = async () => {
       break;
     default:
       console.log('Invalid choice');
+      exit(0);
       break;
   }
 };
