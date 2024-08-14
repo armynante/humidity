@@ -55,11 +55,7 @@ const createProject = async () => {
   if (p.projectType === 'ts_express') {
     p.buildTool = await select({
       message: 'Choose a build tool',
-      choices: [
-        { name: 'pnpm', value: 'pnpm' },
-        { name: 'yarn', value: 'yarn' },
-        { name: 'npm', value: 'npm' },
-      ],
+      choices: [{ name: 'pnpm', value: 'pnpm' }],
     });
     p.prettier = await confirm({
       message: 'Do you want to use Prettier?',
@@ -187,47 +183,77 @@ const createProject = async () => {
   if (p.projectType === 'ts_express') {
     const fileSpinner = ora('Copying files to project directory').start();
     try {
-      const docker = await fs.readFile('./sampleTSProject/Dockerfile');
-      const ignore = await fs.readFile('./sampleTSProject/.gitignore');
-      const src = await fs.readFile('./sampleTSProject/bundle.mjs');
-      const tsconfig = await fs.readFile('./sampleTSProject/tsconfig.json');
-      const editorconfig = await fs.readFile('./sampleTSProject/.editorconfig');
+      const docker = await fs.readFile(
+        './templates/skeletons/sampleTSProject/Dockerfile',
+      );
+      const ignore = await fs.readFile(
+        './templates/skeletons/sampleTSProject/.gitignore',
+      );
+      const tsconfig = await fs.readFile(
+        './templates/skeletons/sampleTSProject/tsconfig.json',
+      );
+      const editorconfig = await fs.readFile(
+        './templates/skeletons/sampleTSProject/.editorconfig',
+      );
+      const nodemon = await fs.readFile(
+        './templates/skeletons/sampleTSProject/nodemon.json',
+      );
+      const packageJson = await fs.readFile(
+        './templates/skeletons/sampleTSProject/package.json',
+      );
+      const packageLock = await fs.readFile(
+        './templates/skeletons/sampleTSProject/pnpm-lock.yaml',
+      );
 
       await fs.writeFile(`${p.projectPath}/Dockerfile`, docker);
       await fs.writeFile(`${p.projectPath}/.gitignore`, ignore);
-      await fs.writeFile(`${p.projectPath}/bundle.mjs`, src);
       await fs.writeFile(`${p.projectPath}/tsconfig.json`, tsconfig);
       await fs.writeFile(`${p.projectPath}/.editorconfig`, editorconfig);
+      await fs.writeFile(`${p.projectPath}/nodemon.json`, nodemon);
+      await fs.writeFile(`${p.projectPath}/package.json`, packageJson);
+      await fs.writeFile(`${p.projectPath}/pnpm-lock.yaml`, packageLock);
+
+      // Make the src directory
+      await mkdir(`${p.projectPath}/src`);
+      // Copy the sample src files
+      const srcFile = await fs.readFile(
+        './templates/skeletons/sampleTSProject/src/index.ts',
+      );
+      await fs.writeFile(`${p.projectPath}/src/index.ts`, srcFile);
 
       if (p.prettier) {
-        const prettier = await fs.readFile('./sampleTSProject/.prettierrc');
+        const prettier = await fs.readFile(
+          './templates/skeletons/sampleTSProject/.prettierrc',
+        );
         const prettierignore = await fs.readFile(
-          './sampleTSProject/.prettierignore',
+          './templates/skeletons/sampleTSProject/.prettierignore',
         );
         await fs.writeFile(`${p.projectPath}/.prettierrc`, prettier);
         await fs.writeFile(`${p.projectPath}/.prettierignore`, prettierignore);
       }
 
       if (p.eslint) {
-        const eslint = await fs.readFile('./sampleTSProject/eslint.config.js');
+        const eslint = await fs.readFile(
+          './templates/skeletons/sampleTSProject/eslint.config.js',
+        );
         const eslintignore = await fs.readFile(
-          './sampleTSProject/.eslintignore',
+          './templates/skeletons/sampleTSProject/.eslintignore',
         );
         await fs.writeFile(`${p.projectPath}/.eslint.config.js`, eslint);
         await fs.writeFile(`${p.projectPath}/.eslintignore`, eslintignore);
       }
-
-      fileSpinner.succeed('Files copied to project directory');
+      // Build the project
+      if (p.buildTool) {
+        // Initialize the project with the build tool
+        fileSpinner.text = 'Building project';
+        await runCommand(p.buildTool, ['install'], p.projectPath);
+        fileSpinner.succeed('Project initialized');
+      }
     } catch (error) {
       fileSpinner.fail('Failed to copy files to project directory');
       console.error(error);
+      throw new Error('Failed to copy files to project directory');
     }
-  }
-  // Initialize the project with the build tool
-  if (p.buildTool) {
-    const buildSpinner = ora('Initializing project').start();
-    await runCommand(p.buildTool, ['init'], p.projectPath);
-    buildSpinner.succeed('Project initialized');
   }
 
   // Create the Git repository
@@ -337,12 +363,17 @@ const createProject = async () => {
   if (p.createDoApp) {
     const doAppSpinner = ora('Creating DigitalOcean App').start();
     // build the image
+    const DO_REGISTRY_NAME = process.env.DO_REGISTRY_NAME;
+    if (!DO_REGISTRY_NAME) {
+      console.error('DigitalOcean registry name not found');
+      return;
+    }
     await runCommand(
       'docker',
       [
         'build',
         '-t',
-        `registry.digitalocean.com/humidresearch/${p.name}:latest`,
+        `registry.digitalocean.com/${DO_REGISTRY_NAME}/${p.name}:latest`,
         '.',
       ],
       p.projectPath,
@@ -351,11 +382,6 @@ const createProject = async () => {
 
     // push the image
     doAppSpinner.text = 'Pushing Docker image';
-    const DO_REGISTRY_NAME = process.env.DO_REGISTRY_NAME;
-    if (!DO_REGISTRY_NAME) {
-      console.error('DigitalOcean registry name not found');
-      return;
-    }
     await runCommand(
       'docker',
       [
