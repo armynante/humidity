@@ -73,11 +73,25 @@ export const settings = async (config: Config | boolean) => {
           const DO_API_TOKEN = await password({
             message: 'Enter your DigitalOcean API token:',
           });
+          const DO_SPACES_REGION = await input({
+            message: 'Enter your DigitalOcean Spaces region:',
+            required: true,
+            default: 'nyc3',
+          });
+          const DO_SPACES_ACCESS_KEY = await password({
+            message: 'Enter your DigitalOcean Spaces API key:',
+          });
+          const DO_SPACES_SECRET_KEY = await password({
+            message: 'Enter your DigitalOcean Spaces secret key:',
+          });
           const userData = {
             GH_USERNAME,
             GH_TOKEN,
             DO_REGISTRY_NAME,
             DO_API_TOKEN,
+            DO_SPACES_REGION,
+            DO_SPACES_ACCESS_KEY,
+            DO_SPACES_SECRET_KEY,
           };
           const envFile = await buildEnvFile(envPath, userData);
           console.log('Env file created at:', envPath);

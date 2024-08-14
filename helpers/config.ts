@@ -66,7 +66,7 @@ export const buildEnvFile = async (
     const resolvedPath = envPath.replace('~', os.homedir());
     const absolutePath = path.resolve(resolvedPath);
     // create the .env file using the envs object using node fs
-    const envFile = `GH_USERNAME=${envs.GH_USERNAME}\nGH_TOKEN=${envs.GH_TOKEN}\nDO_REGISTRY_NAME=${envs.DO_REGISTRY_NAME}\nDO_API_TOKEN=${envs.DO_API_TOKEN}`;
+    const envFile = `GH_USERNAME=${envs.GH_USERNAME}\nGH_TOKEN=${envs.GH_TOKEN}\nDO_REGISTRY_NAME=${envs.DO_REGISTRY_NAME}\nDO_API_TOKEN=${envs.DO_API_TOKEN}\nDO_SPACES_REGION=${envs.DO_SPACES_REGION}\nDO_SPACES_API_KEY=${envs.DO_SPACES_ACCESS_KEY}\nDO_SPACES_SECRET_KEY=${envs.DO_SPACES_SECRET_KEY}`;
     await fs.writeFile(absolutePath, envFile);
   } catch (error) {
     console.error(error);

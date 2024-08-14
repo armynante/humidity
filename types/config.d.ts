@@ -31,6 +31,9 @@ export interface RequiredEnvs {
   GH_TOKEN: string;
   DO_REGISTRY_NAME: string;
   DO_API_TOKEN: string;
+  DO_SPACES_REGION: string;
+  DO_SPACES_ACCESS_KEY: string;
+  DO_SPACES_SECRET_KEY: string;
 }
 
 export interface RequiredEnvsSet {
