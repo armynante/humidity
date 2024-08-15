@@ -26,6 +26,7 @@
     "@aws-sdk/client-api-gateway": "^3.631.0",
     "@aws-sdk/client-iam": "^3.631.0",
     "@aws-sdk/client-lambda": "^3.631.0",
+    "@aws-sdk/client-s3": "^3.632.0",
     "@types/archiver": "^6.0.2",
     "@types/libsodium-wrappers": "^0.7.14",
     "archiver": "^7.0.1",
