@@ -49,27 +49,6 @@ app.post('/upload', upload.single('file'), async (req, res) => {
   }
 });
 
-app.get('/list-files', async (req, res) => {
-  const { bucketName, prefix } = req.query;
-
-  if (!bucketName || !prefix) {
-    return res
-      .status(400)
-      .json({ error: 'bucketName and prefix are required' });
-  }
-
-  try {
-    const objectsList = await bucketClient.listFiles(
-      bucketName as string,
-      prefix as string,
-    );
-    res.json(objectsList);
-  } catch (error) {
-    console.error(error);
-    res.status(500).json({ error: 'Failed to list files' });
-  }
-});
-
 // Start the server
 app.listen(port, () => {
   console.log(`Server running on http://localhost:${port}`);

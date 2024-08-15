@@ -11,7 +11,9 @@ interface BucketClientConfig {
 export class BucketClient {
   private minioClient: Minio.Client;
   public region: string;
+  // @ts-ignore
   private secretKey: string;
+  // @ts-ignore
   private accessKey: string;
 
   constructor({ accessKey, secretKey, region }: BucketClientConfig) {
@@ -54,9 +56,6 @@ export class BucketClient {
     }
   }
 
-  async listFiles(bucketName: string, prefix: string) {
-    //
-
   async deleteBucket(bucketName: string) {
     try {
       const exists = await this.minioClient.bucketExists(bucketName);
@@ -84,7 +83,7 @@ export class BucketClient {
       const fileStream = fs.createReadStream(filePath);
 
       const progressStream = new Transform({
-        transform(chunk, encoding, callback) {
+        transform(chunk, _, callback) {
           uploadedBytes += chunk.length;
           if (progressCallback) {
             progressCallback(uploadedBytes, fileSize);
