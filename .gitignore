@@ -3,3 +3,4 @@ node_modules
 error.log
 .env.humidity
 services/serverless/.DS_Store
+.DS_Store

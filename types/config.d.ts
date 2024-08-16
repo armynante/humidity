@@ -62,7 +62,7 @@ export interface NewProjectQuestions {
   createGHAction: boolean;
   createDoApp: boolean;
   projectType: ProjectType | null;
-  buildTool: 'pnpm' | null;
+  buildTool: string | null;
   prettier: boolean;
   eslint: boolean;
 }

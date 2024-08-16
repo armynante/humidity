@@ -6,12 +6,12 @@ import {
   updateProject,
   viewProject,
 } from '../helpers/config';
-import { deleteDoApp, deleteDoRegistryRepo } from '../helpers/digitalOcean';
 import chalk from 'chalk';
 import { exit } from 'process';
 import { rmdir } from 'node:fs/promises';
 import { buildProjectChoices, projectTable } from '../helpers/transformers';
 import process from 'node:process';
+import DigitalOceanService from '../helpers/digitalOcean';
 const GitHubToken = process.env.GH_TOKEN;
 
 /**
@@ -104,11 +104,13 @@ const listProjects = async () => {
 
       // delete the DigitalOcean App if it exists
       if (project.do_app_id !== '' && project.do_app_id !== undefined) {
+        const DO_API_TOKEN = process.env.DO_API_TOKEN as string;
+        const doService = new DigitalOceanService(DO_API_TOKEN);
         const confDeleteDoApp = await confirm({
           message: 'Delete the DigitalOcean App?',
         });
         if (confDeleteDoApp) {
-          const [, err] = await deleteDoApp(project.do_app_id);
+          const [, err] = await doService.deleteDoApp(project.do_app_id);
           if (err) {
             console.error(err);
             return;
@@ -128,7 +130,10 @@ const listProjects = async () => {
           if (!registry) {
             console.error('DO Registry name not found');
           } else {
-            const [, e] = await deleteDoRegistryRepo(project.name, registry);
+            const [, e] = await doService.deleteDoRegistryRepo(
+              project.name,
+              registry,
+            );
             if (e) {
               console.error(e);
             } else {

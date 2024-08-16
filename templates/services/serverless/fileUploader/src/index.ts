@@ -26,9 +26,6 @@ const bucketClient = new BucketClient({
 
 const SPACE_NAME = 'humidity-demo-bucket-12345';
 
-// Serve static files for the HTML page
-app.use(express.static(path.join(__dirname, '../public')));
-
 // Handle file upload from HTML page
 app.post('/upload', upload.single('file'), async (req, res) => {
   const file = req.file;
