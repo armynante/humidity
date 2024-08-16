@@ -1,6 +1,6 @@
 import axios, { AxiosError, type AxiosResponse } from 'axios';
-import type { DoAppSpec } from '../types/do';
-import { runCommand } from './io';
+import type { DoAppSpec } from '../../types/do';
+import { runCommand } from '../../helpers/io';
 import fs from 'node:fs/promises';
 
 type ApiResponse<T> = [T | null, string | null];

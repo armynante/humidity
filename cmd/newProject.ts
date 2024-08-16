@@ -6,7 +6,7 @@ import {
   viewProject,
 } from '../helpers/config';
 import chalk from 'chalk';
-import DigitalOceanService from '../helpers/digitalOcean';
+import DigitalOceanService from '../services/DigitalOceanClient/DigitalOceanClient';
 import type {
   NewProjectQuestions,
   GHSecret,
