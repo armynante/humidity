@@ -5,8 +5,8 @@
   "scripts": {
     "lint": "eslint .",
     "format": "prettier --write .",
-    "prepare": "husky install",
-    "test": "bun test"
+    "test": "bun test",
+    "prepare": "husky install"
   },
   "devDependencies": {
     "@eslint/js": "^9.9.0",
