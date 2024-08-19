@@ -8,6 +8,9 @@
     "test": "bun test",
     "prepare": "husky install"
   },
+  "hooks": {
+    "pre-commit": "bun test"
+  },
   "devDependencies": {
     "@eslint/js": "^9.9.0",
     "@types/bun": "latest",

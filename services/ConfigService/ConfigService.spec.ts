@@ -106,7 +106,7 @@ describe('ConfigService', () => {
 
     it('should throw an error if project name is not in dash-case', async () => {
       expect(
-        await configService.createNewProject({
+        configService.createNewProject({
           name: 'New Project',
           projectType: 'ts_express',
           description: 'A new project',
