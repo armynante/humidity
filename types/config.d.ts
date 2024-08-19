@@ -5,8 +5,8 @@ export interface Project {
   name: string;
   id: UUID;
   type?: string;
-  created: Date;
-  updated: Date;
+  created: Date | string;
+  updated: Date | string;
   gitHubRepo?: string;
   description?: string;
   do_link?: string;
@@ -27,20 +27,15 @@ export interface Config {
 }
 
 export interface RequiredEnvs {
-  GH_USERNAME: string;
-  GH_TOKEN: string;
-  DO_REGISTRY_NAME: string;
-  DO_API_TOKEN: string;
-  DO_SPACES_REGION: string;
-  DO_SPACES_ACCESS_KEY: string;
-  DO_SPACES_SECRET_KEY: string;
-}
-
-export interface RequiredEnvsSet {
-  GH_USERNAME: boolean;
-  GH_TOKEN: boolean;
-  DO_REGISTRY_NAME: boolean;
-  DO_API_TOKEN: boolean;
+  GH_USERNAME?: string;
+  GH_TOKEN?: string;
+  DO_REGISTRY_NAME?: string;
+  DO_API_TOKEN?: string;
+  DO_SPACES_REGION?: string;
+  DO_SPACES_ACCESS_KEY?: string;
+  DO_SPACES_SECRET_KEY?: string;
+  AMZ_ID?: string;
+  AMZ_SEC?: string;
 }
 
 export interface GHSecret {

@@ -1,10 +1,5 @@
 import { mkdir } from 'node:fs/promises';
 import { select, input, confirm } from '@inquirer/prompts';
-import {
-  createNewProject,
-  updateProject,
-  viewProject,
-} from '../helpers/config';
 import chalk from 'chalk';
 import DigitalOceanService from '../services/DigitalOceanClient/DigitalOceanClient';
 import type {
@@ -23,6 +18,7 @@ import {
   copyTsStarterFiles,
 } from '../helpers/newProject';
 import GitHub from '../helpers/github';
+import type { ConfigService } from '../services/ConfigService/ConfigService';
 
 interface Config {
   GH_TOKEN: string;
@@ -31,42 +27,17 @@ interface Config {
   DO_REGISTRY_NAME: string;
 }
 
-const getConfig = (): Config => {
-  const requiredEnvVars = [
-    'GH_TOKEN',
-    'GH_USERNAME',
-    'DO_API_TOKEN',
-    'DO_REGISTRY_NAME',
-  ];
-  const missingVars = requiredEnvVars.filter(
-    (varName) => !process.env[varName],
-  );
-
-  if (missingVars.length > 0) {
-    throw new Error(
-      `Missing required environment variables: ${missingVars.join(', ')}`,
-    );
-  }
-
-  return {
-    GH_TOKEN: process.env.GH_TOKEN!,
-    GH_USERNAME: process.env.GH_USERNAME!,
-    DO_API_TOKEN: process.env.DO_API_TOKEN!,
-    DO_REGISTRY_NAME: process.env.DO_REGISTRY_NAME!,
-  };
-};
-
-const createProject = async () => {
+const createProject = async (configService: ConfigService) => {
   try {
-    const config = getConfig();
-    const doService = new DigitalOceanService(config.DO_API_TOKEN);
-
     const projectDetails = await gatherProjectDetails();
-    const newProject = await createAndSetupProject(projectDetails, config);
-    await setupVersionControl(projectDetails, newProject, config);
-    await setupCloudDeployment(projectDetails, newProject, doService, config);
+    const newProject = await createAndSetupProject(
+      projectDetails,
+      configService,
+    );
+    await setupVersionControl(projectDetails, newProject, configService);
+    await setupCloudDeployment(projectDetails, newProject, configService);
 
-    displayProjectSummary(newProject);
+    await displayProjectSummary(newProject, configService);
   } catch (error) {
     console.error(
       chalk.red('An error occurred while creating the project:'),
@@ -159,10 +130,10 @@ const gatherProjectDetails = async (): Promise<NewProjectQuestions> => {
 
 const createAndSetupProject = async (
   details: NewProjectQuestions,
-  config: Config,
+  configService: ConfigService,
 ) => {
   const spinner = ora(`Creating new project: ${details.name}`).start();
-  const newProject = await createNewProject(details);
+  const newProject = await configService.createNewProject(details);
   spinner.succeed(`Project created: ${newProject.id}`);
 
   await createProjectStructure(details);
@@ -192,7 +163,7 @@ const setupProjectFiles = async (details: NewProjectQuestions) => {
     }
 
     if (details.createReadme) {
-      const readme = `# ${details.name}\n\n${details.description}`;
+      const readme = `# ${details.name}\n\n${details.description} \n **Created with the Humidity CLI**`;
       await fs.writeFile(`${details.projectPath}/README.md`, readme);
     }
 
@@ -206,18 +177,41 @@ const setupProjectFiles = async (details: NewProjectQuestions) => {
 const setupVersionControl = async (
   details: NewProjectQuestions,
   newProject: any,
-  config: Config,
+  configService: ConfigService,
 ) => {
   if (details.createGitRepo) {
-    const gitSpinner = ora('Setting up version control').start();
+    const gitSpinner = ora('Setting up version control\n').start();
 
     try {
       await runCommand('git', ['init'], details.projectPath);
 
       if (details.createGHRepo) {
-        const GH = new GitHub(config.GH_TOKEN, config.GH_USERNAME);
+        // Check if the user has a GitHub token
+        const config = await configService.load();
+        const [validFile, missingEnvVars] = await configService.validateEnvFile(
+          ['GH_USERNAME', 'GH_TOKEN'],
+        );
+
+        if (
+          !validFile &&
+          missingEnvVars.includes('GH_USERNAME') &&
+          missingEnvVars.includes('GH_TOKEN')
+        ) {
+          console.log(
+            chalk.yellow(
+              'Please set the GH_USERNAME and GH_TOKEN in your .env file to continue',
+            ),
+          );
+          return;
+        }
+        const GH_USERNAME = process.env.GH_USERNAME as string;
+        const GH_TOKEN = process.env.GH_TOKEN as string;
+
+        const GH = new GitHub(GH_TOKEN, GH_USERNAME);
         const { data: repo } = await GH.createRepo(details.name);
-        await updateProject(newProject.id, { gitHubRepo: repo.html_url });
+        await configService.updateProject(newProject.id, {
+          gitHubRepo: repo.html_url,
+        });
 
         if (details.createGHAction) {
           await setupGitHubAction(details, GH, repo);
@@ -299,11 +293,34 @@ const setupGitHubAction = async (
 const setupCloudDeployment = async (
   details: NewProjectQuestions,
   newProject: any,
-  doService: DigitalOceanService,
-  config: Config,
+  configService: ConfigService,
 ) => {
   if (details.createDoApp) {
     const doSpinner = ora('Setting up DigitalOcean App').start();
+
+    // Check if the user has a DigitalOcean token
+    const config = await configService.load();
+    const [validFile, missingEnvVars] = await configService.validateEnvFile([
+      'DO_API_TOKEN',
+      'DO_REGISTRY_NAME',
+    ]);
+
+    if (
+      !validFile &&
+      missingEnvVars.includes('DO_API_TOKEN') &&
+      missingEnvVars.includes('DO_REGISTRY_NAME')
+    ) {
+      console.log(
+        chalk.yellow(
+          'Please set the DO_API_TOKEN and DO_REGISTRY_NAME in your .env file to continue',
+        ),
+      );
+      return;
+    }
+
+    const DO_API_TOKEN = process.env.DO_API_TOKEN as string;
+    const DO_REGISTRY_NAME = process.env.DO_REGISTRY_NAME as string;
+    const doService = new DigitalOceanService(DO_API_TOKEN);
 
     try {
       // Build and push Docker image
@@ -312,7 +329,7 @@ const setupCloudDeployment = async (
         [
           'build',
           '-t',
-          `registry.digitalocean.com/${config.DO_REGISTRY_NAME}/${details.name}:latest`,
+          `registry.digitalocean.com/${DO_REGISTRY_NAME}/${details.name}:latest`,
           '.',
         ],
         details.projectPath,
@@ -322,7 +339,7 @@ const setupCloudDeployment = async (
         'docker',
         [
           'push',
-          `registry.digitalocean.com/${config.DO_REGISTRY_NAME}/${details.name}:latest`,
+          `registry.digitalocean.com/${DO_REGISTRY_NAME}/${details.name}:latest`,
         ],
         details.projectPath,
       );
@@ -360,7 +377,7 @@ const setupCloudDeployment = async (
         JSON.stringify(appStatus, null, 2),
       );
 
-      await updateProject(newProject.id, {
+      await configService.updateProject(newProject.id, {
         do_link: appStatus.app.live_url,
         do_app_id: appStatus.app.id,
         do_config: spec,
@@ -374,8 +391,11 @@ const setupCloudDeployment = async (
   }
 };
 
-const displayProjectSummary = async (project: any) => {
-  const updatedProject = await viewProject(project.id);
+const displayProjectSummary = async (
+  project: any,
+  configService: ConfigService,
+) => {
+  const updatedProject = await configService.viewProject(project.id);
   const table = projectTable(updatedProject);
   console.log(table);
 };

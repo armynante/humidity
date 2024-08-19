@@ -1,25 +1,20 @@
 import { select, input, confirm } from '@inquirer/prompts';
 import GitHub from '../helpers/github';
-import {
-  deleteProject,
-  listProjects as listConfigProjects,
-  updateProject,
-  viewProject,
-} from '../helpers/config';
 import chalk from 'chalk';
 import { exit } from 'process';
 import { rmdir } from 'node:fs/promises';
 import { buildProjectChoices, projectTable } from '../helpers/transformers';
 import process from 'node:process';
 import DigitalOceanService from '../services/DigitalOceanClient/DigitalOceanClient';
+import type { ConfigService } from '../services/ConfigService/ConfigService';
 const GitHubToken = process.env.GH_TOKEN;
 
 /**
  * List projects screen in the CLI.
  * Show actions to view, update, or delete a project.
  */
-const listProjects = async () => {
-  const projects = await listConfigProjects();
+const listProjects = async (configService: ConfigService, reload?: boolean) => {
+  const projects = await configService.listProjects(reload);
   if (projects?.length === 0 || !projects) {
     console.log(
       chalk.whiteBright.bgRed.bold('No projects found. Create a new project.'),
@@ -33,7 +28,8 @@ const listProjects = async () => {
   });
 
   console.log(`Selected project: ${selectedProject}`);
-  const project = await viewProject(selectedProject);
+  const project = await configService.viewProject(selectedProject);
+  console.log(project);
 
   const whatToDo = await select({
     message: 'What do you want to do?',
@@ -57,9 +53,11 @@ const listProjects = async () => {
       const newDescription = await input({
         message: 'Enter a new description:',
       });
-      await updateProject(selectedProject, { description: newDescription });
+      await configService.updateProject(selectedProject, {
+        description: newDescription,
+      });
       console.log('Project updated');
-      await viewProject(selectedProject);
+      await configService.viewProject(selectedProject);
       break;
     }
     case 'delete': {
@@ -152,7 +150,7 @@ const listProjects = async () => {
         await rmdir(project.name, { recursive: true });
       }
 
-      await deleteProject(selectedProject);
+      await configService.deleteProject(selectedProject);
       exit(0);
 
       break;
