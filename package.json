@@ -4,7 +4,9 @@
   "type": "module",
   "scripts": {
     "lint": "eslint .",
-    "format": "prettier --write ."
+    "format": "prettier --write .",
+    "prepare": "husky install",
+    "test": "bun test"
   },
   "devDependencies": {
     "@eslint/js": "^9.9.0",
@@ -16,6 +18,7 @@
     "eslint-plugin-n": "^15.0.0 || ^16.0.0",
     "eslint-plugin-promise": "^6.0.0",
     "globals": "^15.9.0",
+    "husky": "^9.1.4",
     "prettier": "^3.3.3",
     "typescript-eslint": "^8.0.1"
   },
