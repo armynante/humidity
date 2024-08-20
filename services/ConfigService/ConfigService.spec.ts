@@ -1,10 +1,8 @@
-import { describe, expect, it, beforeEach, mock, spyOn } from 'bun:test';
+import { describe, expect, it, beforeEach, spyOn } from 'bun:test';
 import { ConfigService } from './ConfigService';
 import fs from 'node:fs/promises';
 import * as crypto from 'node:crypto';
-import * as dotenv from 'dotenv';
 import * as os from 'os';
-import * as path from 'node:path';
 
 describe('ConfigService', () => {
   let configService: ConfigService;
@@ -124,6 +122,4 @@ describe('ConfigService', () => {
       ).rejects.toThrow('Project name must be in dash-case');
     });
   });
-
-  // Add more test cases for other methods...
 });

@@ -5,14 +5,19 @@
   "scripts": {
     "lint": "eslint .",
     "format": "prettier --write .",
-    "test": "bun test",
+    "test": "jest",
     "prepare": "husky"
+  },
+  "jest": {
+    "preset": "ts-jest",
+    "testEnvironment": "node"
   },
   "hooks": {
     "pre-commit": "bun test"
   },
   "devDependencies": {
     "@eslint/js": "^9.9.0",
+    "@jest/globals": "^29.7.0",
     "@types/bun": "latest",
     "@types/node": "^20.14.12",
     "eslint": "9.x",
@@ -22,7 +27,9 @@
     "eslint-plugin-promise": "^6.0.0",
     "globals": "^15.9.0",
     "husky": "^9.1.4",
+    "jest": "^29.7.0",
     "prettier": "^3.3.3",
+    "ts-jest": "^29.2.4",
     "typescript-eslint": "^8.0.1"
   },
   "peerDependencies": {
