@@ -9,6 +9,7 @@ import {
   type FunctionConfiguration,
   type Runtime,
   RemovePermissionCommand,
+  UpdateFunctionConfigurationCommand,
 } from '@aws-sdk/client-lambda';
 import {
   IAMClient,
@@ -34,6 +35,7 @@ import * as fs from 'fs';
 import * as path from 'path';
 import * as os from 'os';
 import archiver from 'archiver';
+import type { CreateFunctionConfig, FuncConfig } from '../../../types/services';
 
 export class AWSLambdaClient {
   private lambdaClient: LambdaClient;
@@ -250,11 +252,16 @@ export class AWSLambdaClient {
   }
 
   async createOrUpdateFunction(
-    name: string,
-    code: string,
-    handler: string = 'index.handler',
-    runtime: Runtime = 'nodejs18.x',
-  ): Promise<FunctionConfiguration | undefined> {
+    config: CreateFunctionConfig,
+  ): Promise<FuncConfig> {
+    const {
+      name,
+      code,
+      handler = 'index.handler',
+      runtime = 'nodejs18.x',
+      environment = {},
+    } = config;
+
     if (!this.roleArn) {
       await this.createRole();
       // Wait for a short time to ensure the role is ready
@@ -279,6 +286,20 @@ export class AWSLambdaClient {
         };
         const updateCommand = new UpdateFunctionCodeCommand(updateParams);
         await this.lambdaClient.send(updateCommand);
+
+        // Update environment variables
+        if (Object.keys(environment).length > 0) {
+          console.log('Updating environment variables...');
+          const updateEnvParams = {
+            FunctionName: name,
+            Environment: {
+              Variables: environment,
+            },
+          };
+          await this.lambdaClient.send(
+            new UpdateFunctionConfigurationCommand(updateEnvParams),
+          );
+        }
       } else {
         console.log('Creating new function...');
         const createParams = {
@@ -287,6 +308,7 @@ export class AWSLambdaClient {
           Handler: handler,
           Role: this.roleArn,
           Runtime: runtime,
+          Environment: { Variables: environment },
         };
         const createCommand = new CreateFunctionCommand(createParams);
         await this.lambdaClient.send(createCommand);
@@ -299,10 +321,45 @@ export class AWSLambdaClient {
 
       const getFunctionCommand = new GetFunctionCommand({ FunctionName: name });
       const response = await this.lambdaClient.send(getFunctionCommand);
-      return response.Configuration;
+      if (!response.Configuration) {
+        throw new Error('Failed to get function configuration');
+      }
+
+      // check if there is an api gateway
+      const apiUrl = await this.checkApiEndpoint(name);
+      if (apiUrl) {
+        console.log('API Gateway already exists');
+        return { ...response.Configuration, url: apiUrl, internal_name: name };
+      }
+
+      // Create API Gateway
+      console.log('Creating API Gateway...');
+      const newApiUrl = await this.createApiGateway(name);
+
+      return { ...response.Configuration, url: newApiUrl, internal_name: name };
     } catch (error) {
       console.error('Error creating/updating Lambda function:', error);
       throw error;
+    }
+  }
+
+  async checkApiEndpoint(functionName: string): Promise<string | null> {
+    try {
+      const getApisCommand = new GetRestApisCommand({});
+      const apisResponse = await this.apiGatewayClient.send(getApisCommand);
+      const api = apisResponse.items?.find(
+        (api) => api.name === `${functionName}-api`,
+      );
+
+      if (!api || !api.id) {
+        return null;
+      }
+
+      const apiUrl = `https://${api.id}.execute-api.${this.region}.amazonaws.com/prod/${functionName}`;
+      return apiUrl;
+    } catch (error) {
+      console.error('Error checking API endpoint:', error);
+      return null;
     }
   }
 
@@ -313,7 +370,6 @@ export class AWSLambdaClient {
         console.log(`Function ${name} does not exist. Skipping deletion.`);
         return;
       }
-
       const command = new DeleteFunctionCommand({ FunctionName: name });
       await this.lambdaClient.send(command);
       console.log(`Lambda function ${name} deleted successfully`);
@@ -381,8 +437,8 @@ export class AWSLambdaClient {
         throw new Error('Failed to create resource');
       }
 
-      // Create methods (GET and POST)
-      for (const method of ['GET', 'POST']) {
+      // Create methods (GET, POST, PUT, DELETE)
+      for (const method of ['GET', 'POST', 'PUT', 'DELETE']) {
         // Create method
         const putMethodCommand = new PutMethodCommand({
           restApiId: apiId,

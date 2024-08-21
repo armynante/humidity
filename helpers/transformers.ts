@@ -3,8 +3,10 @@ import type {
   NewProjectQuestions,
   Project,
   ProjectChoice,
+  Service,
 } from '../types/config';
 import Table from 'cli-table3';
+import { exit } from 'node:process';
 
 /**
  * Builds a list of project choices for the user to select from
@@ -56,6 +58,26 @@ export const projectTable = (project: Project): string => {
     { 'DigitalOcean App ID': project.do_app_id },
   );
   return table.toString();
+};
+
+export const ServiceTable = (service: Service): string => {
+  const table = new Table();
+  const updated = new Date(service.updated);
+  const created = new Date(service.created);
+  table.push(
+    { 'Service ID': service.id },
+    { Name: service.name },
+    { Type: service.serviceType },
+    { URL: service.url },
+    { Created: created.toLocaleString() },
+    { Updated: updated.toLocaleString() },
+  );
+  return table.toString();
+};
+
+export const showErrorAndExit = (message: string): never => {
+  console.log(chalk.whiteBright.bgRed.bold(message));
+  exit(1);
 };
 
 export function formatSummary(project: NewProjectQuestions): string {

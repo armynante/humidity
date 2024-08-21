@@ -7,14 +7,15 @@ import listProjects from '../cmd/listProjects';
 import { settings } from '../cmd/settings';
 import type { ActionType } from '../types/commands';
 import type { Config } from '../types/config';
-import { ConfigService } from '../services/ConfigService/ConfigService';
+import { ConfigService } from '../services/humidity/config/ConfigService';
+import { showErrorAndExit } from '../helpers/transformers';
+import { deploy } from './deployService';
 
 const MENU_CHOICES: { name: string; value: ActionType }[] = [
-  { name: 'Create a new project', value: 'new' },
-  { name: 'List projects', value: 'ls' },
-  { name: 'Deploy a service', value: 'deploy' },
-  { name: 'Settings', value: 'settings' },
-  { name: 'Function Test', value: 'test' },
+  { name: 'Create a new project ✨', value: 'new' },
+  { name: 'Manage projects 🗂️', value: 'ls' },
+  { name: 'Manage services 🛠️', value: 'services' },
+  { name: 'Settings 📎', value: 'settings' },
   { name: 'Exit', value: 'exit' },
 ];
 
@@ -41,17 +42,12 @@ const ACTION_HANDLERS: Record<ActionType, ActionHandler> = {
     console.log('Listing projects...');
     await listProjects(ConfigInstance, true);
   },
-  deploy: () => console.log('Deploying...'),
+  services: async (config, ConfigInstance) => deploy(config, ConfigInstance),
   test: () => console.log('Running function test...'),
   exit: () => {
     console.log('Exiting...');
     exit(0);
   },
-};
-
-const showErrorAndExit = (message: string): never => {
-  console.log(chalk.whiteBright.bgRed.bold(message));
-  exit(1);
 };
 
 export const main = async (): Promise<void> => {

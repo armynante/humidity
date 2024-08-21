@@ -1,5 +1,6 @@
 import type { UUID } from 'node:crypto';
 import { DoAppSpec } from './do';
+import { ServiceType } from './service';
 
 export interface Project {
   name: string;
@@ -24,6 +25,18 @@ export interface Config {
   useEnvFile: boolean;
   envPath: string;
   projects: Project[];
+  services: Service[];
+}
+
+export interface Service {
+  name: string;
+  internal_name: string;
+  config: Record<string, any>;
+  url: string;
+  id: UUID;
+  updated: Date | string;
+  created: Date | string;
+  serviceType: ServiceType;
 }
 
 export interface RequiredEnvs {
@@ -36,6 +49,20 @@ export interface RequiredEnvs {
   DO_SPACES_SECRET_KEY?: string;
   AMZ_ID?: string;
   AMZ_SEC?: string;
+  AMZ_REGION?: string;
+}
+
+export enum EnvKeys {
+  GH_USERNAME = 'GH_USERNAME',
+  GH_TOKEN = 'GH_TOKEN',
+  DO_REGISTRY_NAME = 'DO_REGISTRY_NAME',
+  DO_API_TOKEN = 'DO_API_TOKEN',
+  DO_SPACES_REGION = 'DO_SPACES_REGION',
+  DO_SPACES_ACCESS_KEY = 'DO_SPACES_ACCESS_KEY',
+  DO_SPACES_SECRET_KEY = 'DO_SPACES_SECRET_KEY',
+  AMZ_ID = 'AMZ_ID',
+  AMZ_SEC = 'AMZ_SEC',
+  AMZ_REGION = 'AMZ_REGION',
 }
 
 export interface GHSecret {

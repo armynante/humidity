@@ -1,7 +1,7 @@
 import { mkdir } from 'node:fs/promises';
 import { select, input, confirm } from '@inquirer/prompts';
 import chalk from 'chalk';
-import DigitalOceanService from '../services/DigitalOceanClient/DigitalOceanClient';
+import DigitalOceanService from '../services/compute/DigitalOceanClient/DigitalOceanClient';
 import type {
   NewProjectQuestions,
   GHSecret,
@@ -18,7 +18,7 @@ import {
   copyTsStarterFiles,
 } from '../helpers/newProject';
 import GitHub from '../helpers/github';
-import type { ConfigService } from '../services/ConfigService/ConfigService';
+import type { ConfigService } from '../services/humidity/config/ConfigService';
 
 interface Config {
   GH_TOKEN: string;

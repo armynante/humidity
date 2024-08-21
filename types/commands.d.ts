@@ -1,1 +1,7 @@
-export type ActionType = 'new' | 'ls' | 'deploy' | 'settings' | 'test' | 'exit';
+export type ActionType =
+  | 'new'
+  | 'ls'
+  | 'services'
+  | 'settings'
+  | 'test'
+  | 'exit';

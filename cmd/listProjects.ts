@@ -5,8 +5,8 @@ import { exit } from 'process';
 import { rmdir } from 'node:fs/promises';
 import { buildProjectChoices, projectTable } from '../helpers/transformers';
 import process from 'node:process';
-import DigitalOceanService from '../services/DigitalOceanClient/DigitalOceanClient';
-import type { ConfigService } from '../services/ConfigService/ConfigService';
+import DigitalOceanService from '../services/compute/DigitalOceanClient/DigitalOceanClient';
+import type { ConfigService } from '../services/humidity/config/ConfigService';
 const GitHubToken = process.env.GH_TOKEN;
 
 /**
