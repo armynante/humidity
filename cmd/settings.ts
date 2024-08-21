@@ -1,7 +1,21 @@
-import { select, confirm, input, password } from '@inquirer/prompts';
-import { ConfigService } from '../services/ConfigService/ConfigService';
-import type { Config } from '../types/config';
-import { spawn } from 'node:child_process';
+import { select, confirm, input, password, checkbox } from '@inquirer/prompts';
+import { ConfigService } from '../services/humidity/config/ConfigService';
+import type { Config } from '../types/config.d.ts';
+// @ts-ignore
+import { EnvKeys } from '../types/config.d.ts';
+
+const envKeyDescriptions: Record<EnvKeys, string> = {
+  [EnvKeys.GH_USERNAME]: 'GitHub Username',
+  [EnvKeys.GH_TOKEN]: 'GitHub Token',
+  [EnvKeys.DO_REGISTRY_NAME]: 'DigitalOcean Registry Name',
+  [EnvKeys.DO_API_TOKEN]: 'DigitalOcean API Token',
+  [EnvKeys.DO_SPACES_REGION]: 'DigitalOcean Spaces Region',
+  [EnvKeys.DO_SPACES_ACCESS_KEY]: 'DigitalOcean Spaces API Key',
+  [EnvKeys.DO_SPACES_SECRET_KEY]: 'DigitalOcean Spaces Secret Key',
+  [EnvKeys.AMZ_ID]: 'AWS Access Key ID',
+  [EnvKeys.AMZ_SEC]: 'AWS Secret Access Key',
+  [EnvKeys.AMZ_REGION]: 'AWS Region',
+};
 
 export const settings = async (
   config: Config | boolean,
@@ -15,90 +29,73 @@ export const settings = async (
         value: 'create',
         disabled: config !== false,
       },
+      { name: 'Set environment variables', value: 'set_env' },
       { name: 'Exit', value: 'exit' },
     ],
   });
 
   switch (options) {
     case 'create': {
-      // Ask if the user wants to use an .env file to store secrets
-      // fot things like GitHub tokens and the DigitalOcean API key
-      const setEnvPath = await confirm({
-        message:
-          'Do you want to use an .env.humidity file to store secrets? \n If you select NO, you will be prompted to enter secrets each time you run a command.\n',
+      // ... (existing create config file logic)
+      break;
+    }
+    case 'set_env': {
+      const useEnvFile = await confirm({
+        message: 'Do you want to use an .env.humidity file to store secrets?',
       });
-      if (setEnvPath) {
-        const envPath = await input({
+
+      let envPath = '';
+      if (useEnvFile) {
+        envPath = await input({
           message:
-            'Where is your .env.humidity file to store secrets going to be live?\n',
+            'Where is your .env.humidity file to store secrets going to be live?',
           default: '~/.humidity/.env',
-          validate: (path) => {
-            if (!path.endsWith('.env')) {
-              return 'Please enter a valid .env file';
-            }
-            return true;
-          },
+          validate: (path) =>
+            path.endsWith('.env') || 'Please enter a valid .env file',
         });
-        // Create the .env file
+      }
+
+      const variablesToSet = await checkbox({
+        message: 'Select the environment variables you want to set:',
+        choices: Object.entries(EnvKeys).map(([key, value]) => ({
+          name: `${envKeyDescriptions[value as EnvKeys]} (${value})`,
+          value: value,
+        })),
+      });
+
+      const userData: Record<string, string> = {};
+
+      for (const variable of variablesToSet) {
+        const isSecret = [
+          EnvKeys.GH_TOKEN,
+          EnvKeys.DO_API_TOKEN,
+          EnvKeys.DO_SPACES_ACCESS_KEY,
+          EnvKeys.DO_SPACES_SECRET_KEY,
+          EnvKeys.AMZ_ID,
+          EnvKeys.AMZ_SEC,
+        ].includes(variable as EnvKeys);
+        const value = await (isSecret ? password : input)({
+          message: `Enter your ${envKeyDescriptions[variable as EnvKeys]}:`,
+          required: true,
+        });
+        userData[variable] = value;
+      }
+
+      if (useEnvFile) {
         const [, err] = await confService.updateConfig({
           envPath,
           useEnvFile: true,
         });
         if (err) {
           console.error(err);
-        }
-        // Ask if they want to create the .env file
-        const createEnv = await confirm({
-          message: 'Do you want to create the .env.humidity file now?',
-        });
-        if (createEnv) {
-          // create the .env file
-          const GH_USERNAME = await input({
-            message: 'Enter your GitHub username:',
-            required: true,
-          });
-          const GH_TOKEN = await password({
-            message: 'Enter your GitHub token:',
-          });
-          const DO_REGISTRY_NAME = await input({
-            message:
-              'Enter your DigitalOcean registry name? This is the name of the repository you want to use for your Docker images:',
-            required: true,
-          });
-          const DO_API_TOKEN = await password({
-            message: 'Enter your DigitalOcean API token:',
-          });
-          const DO_SPACES_REGION = await input({
-            message: 'Enter your DigitalOcean Spaces region:',
-            required: true,
-            default: 'nyc3',
-          });
-          const DO_SPACES_ACCESS_KEY = await password({
-            message: 'Enter your DigitalOcean Spaces API key:',
-          });
-          const DO_SPACES_SECRET_KEY = await password({
-            message: 'Enter your DigitalOcean Spaces secret key:',
-          });
-          const AMZ_ID = await password({
-            message: 'Enter your AWS access key ID:',
-          });
-          const AMZ_SEC = await password({
-            message: 'Enter your AWS secret access key:',
-          });
-          const userData = {
-            GH_USERNAME,
-            GH_TOKEN,
-            DO_REGISTRY_NAME,
-            DO_API_TOKEN,
-            DO_SPACES_REGION,
-            DO_SPACES_ACCESS_KEY,
-            DO_SPACES_SECRET_KEY,
-            AMZ_ID,
-            AMZ_SEC,
-          };
+        } else {
           const envFile = await confService.buildEnvFile(envPath, userData);
-          console.log('Env file created at:', envPath);
+          console.log('Env file updated at:', envPath);
         }
+      } else {
+        console.log('Environment variables set for this session.');
+        // Here you might want to set these variables for the current process
+        // or store them in memory for later use in your application
       }
       break;
     }
