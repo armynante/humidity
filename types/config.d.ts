@@ -34,6 +34,7 @@ export interface Service {
   config: Record<string, any>;
   url: string;
   id: UUID;
+  apiId: string;
   updated: Date | string;
   created: Date | string;
   serviceType: ServiceType;

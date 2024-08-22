@@ -1,4 +1,8 @@
-import { S3Client, type S3ClientConfig } from '@aws-sdk/client-s3';
+import {
+  PutBucketCorsCommand,
+  S3Client,
+  type S3ClientConfig,
+} from '@aws-sdk/client-s3';
 import {
   CreateBucketCommand,
   ListBucketsCommand,
@@ -10,6 +14,7 @@ import {
 import { S3ServiceException } from '@aws-sdk/client-s3';
 import fs from 'fs';
 import { Readable } from 'stream';
+import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
 
 /**
  * Configuration interface for the BucketClient.
@@ -37,20 +42,29 @@ export class BucketClient {
    * @param {BucketClientConfig} config - The configuration object for the client.
    * @param {S3Client} [s3Client] - An optional pre-configured S3Client instance.
    */
-  constructor(config: BucketClientConfig, s3Client?: S3Client) {
-    this.region = config.region;
-    if (s3Client) {
-      this.s3Client = s3Client;
-    } else {
-      const clientConfig: S3ClientConfig = {
-        region: config.region,
-        credentials: {
-          accessKeyId: config.accessKeyId,
-          secretAccessKey: config.secretAccessKey,
-        },
-      };
-      this.s3Client = new S3Client(clientConfig);
-    }
+  constructor() {
+    this.region = process.env.AMZ_REGION || 'us-east-1';
+    console.log('BucketClient constructor called');
+    console.log('Environment variables:', {
+      AWS_REGION: process.env.AMZ_REGION ? 'Present' : 'Missing',
+      AWS_ACCESS_KEY_ID: process.env.AMZ_ID ? 'Present' : 'Missing',
+      AWS_SECRET_ACCESS_KEY: process.env.AMZ_SEC ? 'Present' : 'Missing',
+    });
+
+    //set environment variables
+    process.env.AWS_ACCESS_KEY_ID = process.env.AMZ_ID || '';
+    process.env.AWS_SECRET_ACCESS_KEY = process.env.AMZ_SEC || '';
+
+    const clientConfig: S3ClientConfig = {
+      region: this.region,
+      credentials: {
+        accessKeyId: process.env.AMZ_ID!,
+        secretAccessKey: process.env.AMZ_SEC!,
+      },
+    };
+
+    this.s3Client = new S3Client(clientConfig);
+    console.log('S3Client created');
   }
 
   /**
@@ -63,6 +77,7 @@ export class BucketClient {
     try {
       await this.s3Client.send(new CreateBucketCommand({ Bucket: bucketName }));
       console.log(`Bucket created successfully: ${bucketName}`);
+      await this.setCORSConfiguration(bucketName, ['*']);
     } catch (error: any) {
       if (
         error.name === 'BucketAlreadyExists' ||
@@ -127,81 +142,164 @@ export class BucketClient {
    */
   async uploadFile(
     bucketName: string,
-    filePath: string,
-    destination: string,
-    progressCallback?: (transferred: number, total: number) => void,
+    fileName: string,
+    fileContent: Buffer | Readable,
+    contentType: string,
   ): Promise<void> {
+    console.log(
+      `Attempting to upload file: ${fileName} to bucket: ${bucketName}`,
+    );
     try {
-      const fileContent = await fs.promises.readFile(filePath);
-      const fileSize = (await fs.promises.stat(filePath)).size;
-
-      const uploadParams = {
-        Bucket: bucketName,
-        Key: destination,
-        Body: fileContent,
-      };
-
-      const command = new PutObjectCommand(uploadParams);
-      await this.s3Client.send(command);
-
-      if (progressCallback) {
-        progressCallback(fileSize, fileSize);
+      let body: Buffer | Readable;
+      if (Buffer.isBuffer(fileContent)) {
+        body = fileContent;
+      } else if (fileContent instanceof Readable) {
+        // Convert stream to buffer for binary files
+        const chunks = [];
+        for await (const chunk of fileContent) {
+          chunks.push(chunk);
+        }
+        body = Buffer.concat(chunks);
+      } else {
+        throw new Error('Invalid file content type');
       }
 
-      console.log(`File uploaded successfully: ${filePath}`);
+      const params = {
+        Bucket: bucketName,
+        Key: fileName,
+        Body: body,
+        ContentType: contentType,
+        ContentDisposition: 'attachment', // This ensures the file is downloaded rather than displayed in the browser
+      };
+
+      const command = new PutObjectCommand(params);
+      const response = await this.s3Client.send(command);
+
+      console.log(`File uploaded successfully: ${fileName}`, response);
+
+      // Verify the uploaded file
+      const getObjectCommand = new GetObjectCommand({
+        Bucket: bucketName,
+        Key: fileName,
+      });
+      const { ContentLength, ContentType: uploadedContentType } =
+        await this.s3Client.send(getObjectCommand);
+      console.log(
+        `Verified uploaded file: Size=${ContentLength}, Type=${uploadedContentType}`,
+      );
+
+      if (ContentLength !== body.length) {
+        console.warn(
+          `File size mismatch. Uploaded: ${ContentLength}, Original: ${body.length}`,
+        );
+      }
+      if (uploadedContentType !== contentType) {
+        console.warn(
+          `Content type mismatch. Uploaded: ${uploadedContentType}, Original: ${contentType}`,
+        );
+      }
     } catch (error) {
       console.error('Error during file upload:', error);
       throw error;
     }
   }
 
+  async getPresignedUploadUrl(
+    bucket: string,
+    key: string,
+    contentType: string,
+    expiresIn: number,
+  ): Promise<string> {
+    const command = new PutObjectCommand({
+      Bucket: bucket,
+      Key: key,
+      ContentType: contentType,
+    });
+
+    // Create a pre-signed URL for the command
+    const url = await getSignedUrl(this.s3Client, command, {
+      expiresIn,
+    });
+
+    // Manually append the content-length query parameter
+    const urlObject = new URL(url);
+
+    return urlObject.toString();
+  }
+
   /**
-   * Downloads a file from an S3 bucket.
-   * @param {string} bucketName - The name of the bucket to download from.
-   * @param {string} filePath - The S3 key (path) of the file to download.
-   * @param {string} destination - The local path where the file will be saved.
+   * Sets CORS configuration for an existing S3 bucket.
+   * @param {string} bucketName - The name of the bucket to configure.
+   * @param {string[]} allowedOrigins - Array of allowed origins for CORS.
    * @returns {Promise<void>}
+   * @throws {Error} If setting the CORS configuration fails.
    */
+  private async setCORSConfiguration(
+    bucketName: string,
+    allowedOrigins: string[],
+  ): Promise<void> {
+    try {
+      const corsConfig = {
+        CORSRules: [
+          {
+            AllowedHeaders: ['*'],
+            AllowedMethods: ['GET', 'PUT', 'POST', 'DELETE', 'HEAD'],
+            AllowedOrigins: allowedOrigins,
+            ExposeHeaders: ['ETag'],
+            MaxAgeSeconds: 3000,
+          },
+        ],
+      };
+
+      const command = new PutBucketCorsCommand({
+        Bucket: bucketName,
+        CORSConfiguration: corsConfig,
+      });
+
+      await this.s3Client.send(command);
+      console.log(
+        `CORS configuration set successfully for bucket: ${bucketName}`,
+      );
+    } catch (error) {
+      console.error(`Error setting CORS configuration: ${error}`);
+      throw error;
+    }
+  }
+
   async downloadFile(
     bucketName: string,
-    filePath: string,
-    destination: string,
-  ): Promise<void> {
+    fileName: string,
+  ): Promise<{ content: Buffer; contentType: string }> {
+    console.log(
+      `Attempting to download file: ${fileName} from bucket: ${bucketName}`,
+    );
     try {
       const command = new GetObjectCommand({
         Bucket: bucketName,
-        Key: filePath,
+        Key: fileName,
       });
 
-      const { Body, ContentLength } = await this.s3Client.send(command);
+      const response = await this.s3Client.send(command);
 
-      if (Body instanceof Readable) {
-        const writeStream = fs.createWriteStream(destination);
-        let downloadedBytes = 0;
-
-        Body.on('data', (chunk) => {
-          downloadedBytes += chunk.length;
-          this.showProgress(downloadedBytes, ContentLength || 0, 'Download');
-        });
-
-        Body.pipe(writeStream);
-
-        await new Promise((resolve, reject) => {
-          writeStream.on('finish', resolve);
-          writeStream.on('error', reject);
-        });
-
-        console.log(`\nFile downloaded successfully: ${destination}`);
+      if (response.Body instanceof Readable) {
+        const chunks = [];
+        for await (const chunk of response.Body) {
+          chunks.push(chunk);
+        }
+        const content = Buffer.concat(chunks);
+        console.log(
+          `File downloaded successfully: ${fileName}, Size: ${content.length}, Type: ${response.ContentType}`,
+        );
+        return {
+          content,
+          contentType: response.ContentType || 'application/octet-stream',
+        };
+      } else {
+        throw new Error('Unexpected response body type');
       }
     } catch (error) {
-      if (error instanceof S3ServiceException) {
-        console.error(`Error downloading file: ${error.message}`);
-      } else {
-        console.error(
-          'An unexpected error occurred during file download:',
-          error,
-        );
-      }
+      console.error('Error during file download:', error);
+      throw error;
     }
   }
 

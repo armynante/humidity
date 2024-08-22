@@ -1,16 +1,21 @@
 // @ts-ignore
-import { EnvKeys } from '../../../types/config.d.ts';
+import { EnvKeys, type Service } from '../../../types/config.d.ts';
 import { AWSLambdaClient } from '../../serverless/AWSLambdaClient/AWSLambdaClient';
 import {
   type CreateFunctionConfig,
   type ServiceType,
 } from '../../../types/services';
+
+import { BucketClient } from '../../storage/AWS/AWSBucketClient';
+
 export class DeployService {
   private services: ServiceType[];
   private awsClient: AWSLambdaClient | null;
+  private bucketClient: BucketClient | null;
 
   constructor() {
     this.awsClient = null;
+    this.bucketClient = null;
     this.services = [
       {
         name: 'AWS S3 File upload service',
@@ -35,11 +40,40 @@ export class DeployService {
     ];
   }
 
+  private async initBucketClient() {
+    if (!this.bucketClient) {
+      // const config = {
+      //   accessKeyId: process.env.AMZ_ID || '',
+      //   secretAccessKey: process.env.AMZ_SEC || '',
+      //   region: process.env.AMZ_REGION || '',
+      // };
+      this.bucketClient = new BucketClient();
+    }
+  }
+
   private async deployAWSUploadService(payload: string, name: string) {
     // deploy the AWS upload service
     if (!this.awsClient) {
       await this.initAWSClient();
     }
+
+    if (!this.bucketClient) {
+      await this.initBucketClient();
+    }
+
+    try {
+      const buckets = await this.bucketClient!.listBuckets();
+      if (!buckets || !buckets.includes(name)) {
+        await this.bucketClient!.createBucket(name);
+        console.log(`Bucket ${name} created successfully.`);
+      } else {
+        console.log(`Bucket ${name} already exists.`);
+      }
+    } catch (error) {
+      console.error(`Error managing bucket: ${error}`);
+      throw new Error('Failed to manage bucket');
+    }
+
     // create the lambda function
     const FuncConfig: CreateFunctionConfig = {
       name,
@@ -48,8 +82,10 @@ export class DeployService {
         AMZ_REGION: process.env.AMZ_REGION || '',
         AMZ_ID: process.env.AMZ_ID || '',
         AMZ_SEC: process.env.AMZ_SEC || '',
+        BUCKET_NAME: name,
       },
     };
+
     const lambdaConfig =
       await this.awsClient!.createOrUpdateFunction(FuncConfig);
 
@@ -62,15 +98,15 @@ export class DeployService {
 
   private async initAWSClient() {
     // initialize the AWS client
-    const AWS_REGION = process.env.AMZ_REGION;
-    const AWS_KEY = process.env.AMZ_ID;
-    const AWS_SEC = process.env.AMZ_SEC;
+    const AMZ_REGION = process.env.AWS_REGION;
+    const AMZ_ID = process.env.AMZ_ID;
+    const AMZ_SEC = process.env.AMZ_SEC;
 
-    if (!AWS_REGION || !AWS_KEY || !AWS_SEC) {
+    if (!AMZ_REGION || !AMZ_ID || !AMZ_SEC) {
       throw new Error('AWS credentials not found');
     }
     if (!this.awsClient) {
-      this.awsClient = new AWSLambdaClient(AWS_REGION, AWS_KEY, AWS_SEC);
+      this.awsClient = new AWSLambdaClient(AMZ_REGION, AMZ_ID, AMZ_SEC);
     }
   }
 
@@ -90,15 +126,21 @@ export class DeployService {
     }
   }
 
-  async destroyService(serviceName: string, serviceType: string) {
+  async destroyService(service: Service, serviceType: string) {
     try {
       if (!this.awsClient) {
         await this.initAWSClient();
       }
+      if (!this.bucketClient) {
+        await this.initBucketClient();
+      }
       // destroy the service
       switch (serviceType) {
-        case 'aws_upload':
-          return this.awsClient!.tearDown(serviceName);
+        case 'aws_upload': {
+          // delete the bucket
+          await this.bucketClient!.deleteBucket(service.internal_name);
+          return this.awsClient!.tearDown(service);
+        }
         case 'do_upload':
           throw new Error('Not implemented');
         default:

@@ -30,12 +30,17 @@ import {
   CreateDeploymentCommand,
   DeleteRestApiCommand,
   GetRestApisCommand,
+  PutRestApiCommand,
+  UpdateMethodCommand,
+  PutIntegrationResponseCommand,
+  PutMethodResponseCommand,
 } from '@aws-sdk/client-api-gateway';
 import * as fs from 'fs';
 import * as path from 'path';
 import * as os from 'os';
 import archiver from 'archiver';
 import type { CreateFunctionConfig, FuncConfig } from '../../../types/services';
+import type { Service } from '../../../types/config';
 
 export class AWSLambdaClient {
   private lambdaClient: LambdaClient;
@@ -44,11 +49,13 @@ export class AWSLambdaClient {
   private region: string;
   private roleName: string;
   private roleArn: string | null;
+  private apiId: string | null;
 
   constructor(region: string, accessKeyId: string, secretAccessKey: string) {
     this.region = region;
     this.roleName = 'LambdaExecutionRole';
     this.roleArn = null;
+    this.apiId = null;
 
     const config = {
       region: this.region,
@@ -109,35 +116,37 @@ export class AWSLambdaClient {
     }
   }
 
-  async deleteApiGateway(functionName: string): Promise<void> {
+  async deleteApiGateway(service: Service): Promise<void> {
     try {
       // Find the API ID
       const getApisCommand = new GetRestApisCommand({});
       const apisResponse = await this.apiGatewayClient.send(getApisCommand);
       const api = apisResponse.items?.find(
-        (api) => api.name === `${functionName}-api`,
+        (api) => api.name === `${service.internal_name}-api`,
       );
 
       if (!api || !api.id) {
-        console.log(`No API found for function ${functionName}`);
+        console.log(`No API found for function ${service.name}`);
         return;
       }
 
       // Delete the API
-      const deleteApiCommand = new DeleteRestApiCommand({ restApiId: api.id });
+      const deleteApiCommand = new DeleteRestApiCommand({
+        restApiId: service.apiId,
+      });
       await this.apiGatewayClient.send(deleteApiCommand);
 
-      console.log(`API Gateway for ${functionName} deleted successfully`);
+      console.log(`API Gateway for ${service.name} deleted successfully`);
 
       // Remove Lambda permission
       const removePermissionCommand = new RemovePermissionCommand({
-        FunctionName: functionName,
-        StatementId: 'apigateway-test-2',
+        FunctionName: service.internal_name,
+        StatementId: 'apigateway-' + service.apiId,
       });
       await this.lambdaClient.send(removePermissionCommand);
 
       console.log(
-        `Removed API Gateway permission from Lambda function ${functionName}`,
+        `Removed API Gateway permission from Lambda function ${service.name}`,
       );
     } catch (error) {
       console.error('Error deleting API Gateway:', error);
@@ -204,10 +213,10 @@ export class AWSLambdaClient {
     });
   }
 
-  async tearDown(functionName: string): Promise<void> {
+  async tearDown(service: Service): Promise<void> {
     try {
-      await this.deleteApiGateway(functionName);
-      await this.deleteFunction(functionName);
+      await this.deleteApiGateway(service);
+      await this.deleteFunction(service.internal_name);
       await this.deleteRole();
       console.log('All resources have been deleted successfully');
     } catch (error) {
@@ -292,6 +301,7 @@ export class AWSLambdaClient {
           console.log('Updating environment variables...');
           const updateEnvParams = {
             FunctionName: name,
+            Timeout: 60,
             Environment: {
               Variables: environment,
             },
@@ -329,14 +339,24 @@ export class AWSLambdaClient {
       const apiUrl = await this.checkApiEndpoint(name);
       if (apiUrl) {
         console.log('API Gateway already exists');
-        return { ...response.Configuration, url: apiUrl, internal_name: name };
+        return {
+          ...response.Configuration,
+          url: apiUrl,
+          internal_name: name,
+          apiId: this.apiId || '',
+        };
       }
 
       // Create API Gateway
       console.log('Creating API Gateway...');
-      const newApiUrl = await this.createApiGateway(name);
+      const [newApiUrl, apiId] = await this.createAPIGateway(name);
 
-      return { ...response.Configuration, url: newApiUrl, internal_name: name };
+      return {
+        ...response.Configuration,
+        url: newApiUrl,
+        internal_name: name,
+        apiId: apiId,
+      };
     } catch (error) {
       console.error('Error creating/updating Lambda function:', error);
       throw error;
@@ -354,7 +374,7 @@ export class AWSLambdaClient {
       if (!api || !api.id) {
         return null;
       }
-
+      this.apiId = api.id;
       const apiUrl = `https://${api.id}.execute-api.${this.region}.amazonaws.com/prod/${functionName}`;
       return apiUrl;
     } catch (error) {
@@ -398,107 +418,145 @@ export class AWSLambdaClient {
     }
   }
 
-  async createApiGateway(functionName: string): Promise<string> {
+  async createAPIGateway(functionName: string): Promise<[string, string]> {
+    // Get the Lambda function ARN
+    const getFunctionCommand = new GetFunctionCommand({
+      FunctionName: functionName,
+    });
+    const lambdaFunction = await this.lambdaClient.send(getFunctionCommand);
+    const lambdaArn = lambdaFunction.Configuration?.FunctionArn;
+
+    if (!lambdaArn) {
+      throw new Error('Failed to retrieve Lambda function ARN');
+    }
+
+    // Create API
+    const createApiCommand = new CreateRestApiCommand({
+      name: `${functionName}-api`,
+      binaryMediaTypes: ['*/*'],
+      endpointConfiguration: { types: ['REGIONAL'] },
+    });
+    const api = await this.apiGatewayClient.send(createApiCommand);
+
+    // Get API root resource ID
+    const getResourcesCommand = new GetResourcesCommand({
+      restApiId: api.id!,
+    });
+    const resources = await this.apiGatewayClient.send(getResourcesCommand);
+    const rootResourceId = resources.items![0].id;
+
+    // Create resource
+    // Create or get existing resource
+    let resource;
     try {
-      // Create API
-      const createApiCommand = new CreateRestApiCommand({
-        name: `${functionName}-api`,
-        description: `API for ${functionName}`,
-      });
-      const apiResponse = await this.apiGatewayClient.send(createApiCommand);
-      const apiId = apiResponse.id;
-
-      if (!apiId) {
-        throw new Error('Failed to create API');
-      }
-
-      // Get root resource ID
-      const getResourcesCommand = new GetResourcesCommand({ restApiId: apiId });
-      const resourcesResponse =
-        await this.apiGatewayClient.send(getResourcesCommand);
-      const rootResourceId = resourcesResponse.items?.[0].id;
-
-      if (!rootResourceId) {
-        throw new Error('Failed to get root resource ID');
-      }
-
-      // Create resource
       const createResourceCommand = new CreateResourceCommand({
-        restApiId: apiId,
-        parentId: rootResourceId,
-        pathPart: functionName,
+        restApiId: api.id!,
+        parentId: rootResourceId!,
+        pathPart: '{proxy+}',
       });
-      const resourceResponse = await this.apiGatewayClient.send(
-        createResourceCommand,
-      );
-      const resourceId = resourceResponse.id;
-
-      if (!resourceId) {
-        throw new Error('Failed to create resource');
+      resource = await this.apiGatewayClient.send(createResourceCommand);
+    } catch (error: any) {
+      if (error.name === 'ConflictException') {
+        console.log('Resource already exists, retrieving existing resource');
+        const resources = await this.apiGatewayClient.send(getResourcesCommand);
+        resource = resources.items!.find((r) => r.path === '/{proxy+}');
+        if (!resource) {
+          throw new Error('Could not find existing resource');
+        }
+      } else {
+        throw error;
       }
+    }
 
-      // Create methods (GET, POST, PUT, DELETE)
-      for (const method of ['GET', 'POST', 'PUT', 'DELETE']) {
-        // Create method
+    // Create or update methods
+    const methods = ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'];
+    for (const method of methods) {
+      try {
         const putMethodCommand = new PutMethodCommand({
-          restApiId: apiId,
-          resourceId: resourceId,
+          restApiId: api.id!,
+          resourceId: resource.id!,
           httpMethod: method,
           authorizationType: 'NONE',
         });
         await this.apiGatewayClient.send(putMethodCommand);
-
-        // Create integration
-        const putIntegrationCommand = new PutIntegrationCommand({
-          restApiId: apiId,
-          resourceId: resourceId,
-          httpMethod: method,
-          type: 'AWS_PROXY',
-          integrationHttpMethod: 'POST',
-          uri: `arn:aws:apigateway:${this.region}:lambda:path/2015-03-31/functions/arn:aws:lambda:${this.region}:${await this.getAccountId()}:function:${functionName}/invocations`,
-        });
-        await this.apiGatewayClient.send(putIntegrationCommand);
+      } catch (error: any) {
+        if (error.name !== 'ConflictException') {
+          throw error;
+        }
+        console.log(`Method ${method} already exists, updating integration`);
       }
 
-      // Deploy API
-      const createDeploymentCommand = new CreateDeploymentCommand({
-        restApiId: apiId,
-        stageName: 'prod',
+      const putIntegrationCommand = new PutIntegrationCommand({
+        restApiId: api.id!,
+        resourceId: resource.id!,
+        httpMethod: method,
+        type: 'AWS_PROXY',
+        integrationHttpMethod: 'POST',
+        uri: `arn:aws:apigateway:${this.region}:lambda:path/2015-03-31/functions/${lambdaArn}/invocations`,
+        contentHandling: 'CONVERT_TO_BINARY',
       });
-      await this.apiGatewayClient.send(createDeploymentCommand);
+      await this.apiGatewayClient.send(putIntegrationCommand);
 
-      // Remove existing permission if it exists
-      try {
-        const removePermissionCommand = new RemovePermissionCommand({
-          FunctionName: functionName,
-          StatementId: 'apigateway-test-2',
-        });
-        await this.lambdaClient.send(removePermissionCommand);
-        console.log(
-          'Removed existing API Gateway permission from Lambda function',
-        );
-      } catch (error) {
-        // If the permission doesn't exist, that's fine, we'll add it next
-        console.log('No existing permission to remove');
-      }
-
-      // Add permission to Lambda function
-      const addPermissionCommand = new AddPermissionCommand({
-        FunctionName: functionName,
-        StatementId: 'apigateway-test-2',
-        Action: 'lambda:InvokeFunction',
-        Principal: 'apigateway.amazonaws.com',
-        SourceArn: `arn:aws:execute-api:${this.region}:${await this.getAccountId()}:${apiId}/*/*/${functionName}`,
+      const putMethodResponseCommand = new PutMethodResponseCommand({
+        restApiId: api.id!,
+        resourceId: resource.id!,
+        httpMethod: method,
+        statusCode: '200',
+        responseModels: {
+          'application/json': 'Empty',
+        },
+        responseParameters: {
+          'method.response.header.Access-Control-Allow-Headers': true,
+          'method.response.header.Access-Control-Allow-Methods': true,
+          'method.response.header.Access-Control-Allow-Origin': true,
+          'method.response.header.Content-Type': true,
+        },
       });
-      await this.lambdaClient.send(addPermissionCommand);
+      await this.apiGatewayClient.send(putMethodResponseCommand);
 
-      const apiUrl = `https://${apiId}.execute-api.${this.region}.amazonaws.com/prod/${functionName}`;
-      console.log(`API Gateway created. URL: ${apiUrl}`);
-      return apiUrl;
-    } catch (error) {
-      console.error('Error creating API Gateway:', error);
-      throw error;
+      const putIntegrationResponseCommand = new PutIntegrationResponseCommand({
+        restApiId: api.id!,
+        resourceId: resource.id!,
+        httpMethod: method,
+        statusCode: '200',
+        responseTemplates: {
+          'application/json': '',
+        },
+        responseParameters: {
+          'method.response.header.Access-Control-Allow-Headers':
+            "'Content-Type,X-Amz-Date,Authorization,X-Api-Key,X-Amz-Security-Token'",
+          'method.response.header.Access-Control-Allow-Methods':
+            "'GET,OPTIONS,POST,PUT,DELETE'",
+          'method.response.header.Access-Control-Allow-Origin': "'*'",
+          'method.response.header.Content-Type':
+            'integration.response.header.Content-Type',
+        },
+        contentHandling: 'CONVERT_TO_BINARY',
+      });
+      await this.apiGatewayClient.send(putIntegrationResponseCommand);
     }
+
+    // Deploy API
+    const createDeploymentCommand = new CreateDeploymentCommand({
+      restApiId: api.id!,
+      stageName: 'prod',
+    });
+    await this.apiGatewayClient.send(createDeploymentCommand);
+
+    // Add permission for API Gateway to invoke Lambda
+    const addPermissionCommand = new AddPermissionCommand({
+      FunctionName: functionName,
+      StatementId: `apigateway-${api.id}`,
+      Action: 'lambda:InvokeFunction',
+      Principal: 'apigateway.amazonaws.com',
+      SourceArn: `arn:aws:execute-api:${this.region}:${await this.getAccountId()}:${api.id}/*/*`,
+    });
+    await this.lambdaClient.send(addPermissionCommand);
+
+    return [
+      `https://${api.id}.execute-api.${this.region}.amazonaws.com/prod/${functionName}`,
+      api.id!,
+    ];
   }
 
   private async getAccountId(): Promise<string> {

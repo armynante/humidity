@@ -71,7 +71,7 @@ const ACTION_HANDLERS: Record<string, ActionHandler> = {
 
           // Generate a random uuid for the service name to avoid conflicts
           const uuid = randomUUID();
-          const internalName = serviceName + '_' + uuid;
+          const internalName = serviceName + '-' + uuid;
           const lambdaConfig = await Deploy.deployService(
             'aws_upload',
             payload,
@@ -88,12 +88,15 @@ const ACTION_HANDLERS: Record<string, ActionHandler> = {
             config: lambdaConfig,
             url: lambdaConfig.url,
             id: uuid,
+            apiId: lambdaConfig.apiId,
             created: new Date().toISOString(),
             updated: new Date().toISOString(),
             serviceType: 'aws_upload',
           };
           await ConfigInstance.addService(serviceConfig);
           uploadSpinner.succeed('Service deployed successfully');
+          // render the service table
+          console.log(ServiceTable(serviceConfig));
           exit(0);
           break;
         }
@@ -163,7 +166,7 @@ const ACTION_HANDLERS: Record<string, ActionHandler> = {
           return;
         }
         const deleteSpinner = ora('Deleting service...').start();
-        await Deploy.destroyService(service.internal_name, service.serviceType);
+        await Deploy.destroyService(service, service.serviceType);
         deleteSpinner.text = 'Service deleted';
         await ConfigInstance.deleteService(selectedService);
         deleteSpinner.succeed('Config updated successfully');

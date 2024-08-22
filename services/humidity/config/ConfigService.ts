@@ -58,6 +58,7 @@ const ServiceSchema = z.object({
   updated: z.date().or(z.string()),
   created: z.date().or(z.string()),
   serviceType: z.string(),
+  apiId: z.string(),
 });
 
 const ConfigSchema = z.object({

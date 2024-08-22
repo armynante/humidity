@@ -13,6 +13,7 @@ export interface ServiceType {
 export interface FuncConfig extends FunctionConfiguration {
   url: string;
   internal_name: string;
+  apiId: string;
 }
 
 export interface CreateFunctionConfig {
