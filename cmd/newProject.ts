@@ -19,6 +19,7 @@ import {
 } from '../helpers/newProject';
 import GitHub from '../helpers/github';
 import type { ConfigService } from '../services/humidity/config/ConfigService';
+import { ConfigInstance } from './main';
 
 interface Config {
   GH_TOKEN: string;
@@ -27,17 +28,14 @@ interface Config {
   DO_REGISTRY_NAME: string;
 }
 
-const createProject = async (configService: ConfigService) => {
+const createProject = async () => {
   try {
     const projectDetails = await gatherProjectDetails();
-    const newProject = await createAndSetupProject(
-      projectDetails,
-      configService,
-    );
-    await setupVersionControl(projectDetails, newProject, configService);
-    await setupCloudDeployment(projectDetails, newProject, configService);
+    const newProject = await createAndSetupProject(projectDetails);
+    await setupVersionControl(projectDetails, newProject);
+    await setupCloudDeployment(projectDetails, newProject);
 
-    await displayProjectSummary(newProject, configService);
+    await displayProjectSummary(newProject);
   } catch (error) {
     console.error(
       chalk.red('An error occurred while creating the project:'),
@@ -128,12 +126,9 @@ const gatherProjectDetails = async (): Promise<NewProjectQuestions> => {
   };
 };
 
-const createAndSetupProject = async (
-  details: NewProjectQuestions,
-  configService: ConfigService,
-) => {
+const createAndSetupProject = async (details: NewProjectQuestions) => {
   const spinner = ora(`Creating new project: ${details.name}`).start();
-  const newProject = await configService.createNewProject(details);
+  const newProject = await ConfigInstance.createNewProject(details);
   spinner.succeed(`Project created: ${newProject.id}`);
 
   await createProjectStructure(details);
@@ -177,7 +172,6 @@ const setupProjectFiles = async (details: NewProjectQuestions) => {
 const setupVersionControl = async (
   details: NewProjectQuestions,
   newProject: any,
-  configService: ConfigService,
 ) => {
   if (details.createGitRepo) {
     const gitSpinner = ora('Setting up version control\n').start();
@@ -187,10 +181,9 @@ const setupVersionControl = async (
 
       if (details.createGHRepo) {
         // Check if the user has a GitHub token
-        const config = await configService.load();
-        const [validFile, missingEnvVars] = await configService.validateEnvFile(
-          ['GH_USERNAME', 'GH_TOKEN'],
-        );
+        const config = await ConfigInstance.load();
+        const [validFile, missingEnvVars] =
+          await ConfigInstance.validateEnvFile(['GH_USERNAME', 'GH_TOKEN']);
 
         if (
           !validFile &&
@@ -209,7 +202,7 @@ const setupVersionControl = async (
 
         const GH = new GitHub(GH_TOKEN, GH_USERNAME);
         const { data: repo } = await GH.createRepo(details.name);
-        await configService.updateProject(newProject.id, {
+        await ConfigInstance.updateProject(newProject.id, {
           gitHubRepo: repo.html_url,
         });
 
@@ -293,14 +286,13 @@ const setupGitHubAction = async (
 const setupCloudDeployment = async (
   details: NewProjectQuestions,
   newProject: any,
-  configService: ConfigService,
 ) => {
   if (details.createDoApp) {
     const doSpinner = ora('Setting up DigitalOcean App').start();
 
     // Check if the user has a DigitalOcean token
-    const config = await configService.load();
-    const [validFile, missingEnvVars] = await configService.validateEnvFile([
+    const config = await ConfigInstance.load();
+    const [validFile, missingEnvVars] = await ConfigInstance.validateEnvFile([
       'DO_API_TOKEN',
       'DO_REGISTRY_NAME',
     ]);
@@ -377,7 +369,7 @@ const setupCloudDeployment = async (
         JSON.stringify(appStatus, null, 2),
       );
 
-      await configService.updateProject(newProject.id, {
+      await ConfigInstance.updateProject(newProject.id, {
         do_link: appStatus.app.live_url,
         do_app_id: appStatus.app.id,
         do_config: spec,
@@ -391,11 +383,8 @@ const setupCloudDeployment = async (
   }
 };
 
-const displayProjectSummary = async (
-  project: any,
-  configService: ConfigService,
-) => {
-  const updatedProject = await configService.viewProject(project.id);
+const displayProjectSummary = async (project: any) => {
+  const updatedProject = await ConfigInstance.viewProject(project.id);
   const table = projectTable(updatedProject);
   console.log(table);
 };

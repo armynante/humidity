@@ -1,4 +1,6 @@
 import {
+  DeleteObjectsCommand,
+  ListObjectsV2Command,
   PutBucketCorsCommand,
   S3Client,
   type S3ClientConfig,
@@ -44,12 +46,6 @@ export class BucketClient {
    */
   constructor() {
     this.region = process.env.AMZ_REGION || 'us-east-1';
-    console.log('BucketClient constructor called');
-    console.log('Environment variables:', {
-      AWS_REGION: process.env.AMZ_REGION ? 'Present' : 'Missing',
-      AWS_ACCESS_KEY_ID: process.env.AMZ_ID ? 'Present' : 'Missing',
-      AWS_SECRET_ACCESS_KEY: process.env.AMZ_SEC ? 'Present' : 'Missing',
-    });
 
     //set environment variables
     process.env.AWS_ACCESS_KEY_ID = process.env.AMZ_ID || '';
@@ -88,6 +84,59 @@ export class BucketClient {
         console.error(`Error creating bucket: ${error.message}`);
         throw error;
       }
+    }
+  }
+
+  /**
+   * Empties an S3 bucket by deleting all objects within it.
+   * @param {string} bucketName - The name of the bucket to empty.
+   * @returns {Promise<void>}
+   * @throws {Error} If emptying the bucket fails.
+   */
+  async emptyBucket(bucketName: string): Promise<void> {
+    console.log(`Attempting to empty bucket: ${bucketName}`);
+
+    try {
+      let continuationToken: string | undefined;
+
+      do {
+        // List objects in the bucket
+        const listCommand = new ListObjectsV2Command({
+          Bucket: bucketName,
+          ContinuationToken: continuationToken,
+        });
+
+        const listedObjects = await this.s3Client.send(listCommand);
+
+        if (listedObjects.Contents && listedObjects.Contents.length > 0) {
+          const deleteParams: {
+            Bucket: string;
+            Delete: { Objects: { Key: string }[] };
+          } = {
+            Bucket: bucketName,
+            Delete: { Objects: [] },
+          };
+
+          listedObjects.Contents.forEach(({ Key }) => {
+            if (Key) {
+              deleteParams.Delete.Objects.push({ Key });
+            }
+          });
+
+          // Delete objects
+          const deleteCommand = new DeleteObjectsCommand(deleteParams);
+          await this.s3Client.send(deleteCommand);
+
+          console.log(`Deleted ${deleteParams.Delete.Objects.length} objects`);
+        }
+
+        continuationToken = listedObjects.NextContinuationToken;
+      } while (continuationToken);
+
+      console.log(`Successfully emptied bucket: ${bucketName}`);
+    } catch (error) {
+      console.error(`Error emptying bucket: ${error}`);
+      throw error;
     }
   }
 

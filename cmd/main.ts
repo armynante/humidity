@@ -6,10 +6,12 @@ import createProject from '../cmd/newProject';
 import listProjects from '../cmd/listProjects';
 import { settings } from '../cmd/settings';
 import type { ActionType } from '../types/commands';
-import type { Config } from '../types/config';
 import { ConfigService } from '../services/humidity/config/ConfigService';
 import { showErrorAndExit } from '../helpers/transformers';
 import { deploy } from './deployService';
+import { FileSystemWrapper } from '../helpers/filesystem';
+import { Logger } from '../helpers/logger';
+import { TemplateService } from '../services/humidity/templates/TemplateService';
 
 const MENU_CHOICES: { name: string; value: ActionType }[] = [
   { name: 'Create a new project ✨', value: 'new' },
@@ -19,30 +21,23 @@ const MENU_CHOICES: { name: string; value: ActionType }[] = [
   { name: 'Exit', value: 'exit' },
 ];
 
-type ActionHandler = (
-  config: Config | null,
-  ConfigInstance: ConfigService,
-) => Promise<void> | void;
-
-const ACTION_HANDLERS: Record<ActionType, ActionHandler> = {
-  settings: async (config, ConfigInstance) => {
+const ACTION_HANDLERS: Record<ActionType, any> = {
+  settings: async () => {
+    const config = await ConfigInstance.load();
     if (config === null) {
-      console.log(
-        chalk.yellow('No existing configuration. Creating a new one.'),
-      );
-      return showErrorAndExit('No existing configuration. Creating a new one.');
+      logger.extWarn('No existing configuration. Creating a new one.');
     }
     await settings(config, ConfigInstance);
   },
-  new: async (_, ConfigInstance) => {
-    console.log('Creating a new project...');
-    await createProject(ConfigInstance);
+  new: async () => {
+    logger.extInfo('Creating a new project...');
+    await createProject();
   },
-  ls: async (_, ConfigInstance) => {
-    console.log('Listing projects...');
-    await listProjects(ConfigInstance, true);
+  ls: async () => {
+    logger.extInfo('Listing projects...');
+    await listProjects(true);
   },
-  services: async (config, ConfigInstance) => deploy(config, ConfigInstance),
+  services: async () => deploy(),
   test: () => console.log('Running function test...'),
   exit: () => {
     console.log('Exiting...');
@@ -50,19 +45,19 @@ const ACTION_HANDLERS: Record<ActionType, ActionHandler> = {
   },
 };
 
+export const logger = new Logger('EXT_DEBUG');
+const fs = new FileSystemWrapper();
+export const ConfigInstance = new ConfigService(fs, logger);
+export const TemplateInstance = new TemplateService(fs, logger);
+
 export const main = async (): Promise<void> => {
   displayLogo();
-  const ConfigInstance = new ConfigService();
 
   const [created, config] = await ConfigInstance.init();
 
   if (created) {
-    console.log(
-      chalk.green('New configuration created at ~/.humidity/config.json'),
-    );
-    console.log(
-      chalk.yellow('Please update the configuration file with your settings.'),
-    );
+    logger.extInfo('Configuration file created successfully.');
+    logger.extWarn('Please update the configuration file with your details.');
   }
 
   const action = await select<ActionType>({

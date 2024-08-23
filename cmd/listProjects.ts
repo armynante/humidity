@@ -7,14 +7,15 @@ import { buildProjectChoices, projectTable } from '../helpers/transformers';
 import process from 'node:process';
 import DigitalOceanService from '../services/compute/DigitalOceanClient/DigitalOceanClient';
 import type { ConfigService } from '../services/humidity/config/ConfigService';
+import { ConfigInstance } from './main';
 const GitHubToken = process.env.GH_TOKEN;
 
 /**
  * List projects screen in the CLI.
  * Show actions to view, update, or delete a project.
  */
-const listProjects = async (configService: ConfigService, reload?: boolean) => {
-  const projects = await configService.listProjects(reload);
+const listProjects = async (reload?: boolean) => {
+  const projects = await ConfigInstance.listProjects(reload);
   if (projects?.length === 0 || !projects) {
     console.log(
       chalk.whiteBright.bgRed.bold('No projects found. Create a new project.'),
@@ -28,7 +29,7 @@ const listProjects = async (configService: ConfigService, reload?: boolean) => {
   });
 
   console.log(`Selected project: ${selectedProject}`);
-  const project = await configService.viewProject(selectedProject);
+  const project = await ConfigInstance.viewProject(selectedProject);
   console.log(project);
 
   const whatToDo = await select({
@@ -53,11 +54,11 @@ const listProjects = async (configService: ConfigService, reload?: boolean) => {
       const newDescription = await input({
         message: 'Enter a new description:',
       });
-      await configService.updateProject(selectedProject, {
+      await ConfigInstance.updateProject(selectedProject, {
         description: newDescription,
       });
       console.log('Project updated');
-      await configService.viewProject(selectedProject);
+      await ConfigInstance.viewProject(selectedProject);
       break;
     }
     case 'delete': {
@@ -150,7 +151,7 @@ const listProjects = async (configService: ConfigService, reload?: boolean) => {
         await rmdir(project.name, { recursive: true });
       }
 
-      await configService.deleteProject(selectedProject);
+      await ConfigInstance.deleteProject(selectedProject);
       exit(0);
 
       break;

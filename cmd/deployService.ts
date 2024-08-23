@@ -11,12 +11,96 @@ import { exit } from 'node:process';
 import { select, input } from '@inquirer/prompts';
 import chalk from 'chalk';
 import { ServiceTable } from '../helpers/transformers';
+import { TemplateInstance } from './main';
+import { ConfigInstance } from './main';
 
 const MENU_CHOICES: { name: string; value: string }[] = [
   { name: 'Deploy a service from a template', value: 'upload' },
   { name: 'List deployed services', value: 'list' },
+  { name: 'Create a new template', value: 'create_template' },
+  { name: 'Destroy a template', value: 'destroy_template' },
   { name: 'Exit', value: 'exit_program' },
 ];
+
+const handleCreateTemplate = async () => {
+  const templateName = await input({
+    message: 'Enter a name for the new template:',
+    validate: (name: string) => name.length > 0 || 'Please enter a name',
+  });
+
+  const createSpinner = ora('Creating template...').start();
+
+  try {
+    await TemplateInstance.createTemplate(templateName);
+    createSpinner.succeed(`Template "${templateName}" created successfully`);
+  } catch (error) {
+    createSpinner.fail(
+      `Failed to create template: ${(error as Error).message}`,
+    );
+  }
+
+  exit(0);
+};
+
+const handleDestroyTemplate = async () => {
+  const templatesPath = TemplateInstance.getTemplatesPath();
+
+  try {
+    const templates = await fs.readdir(templatesPath);
+    const filteredTemplates = templates.filter(
+      (template) => !template.startsWith('.'),
+    );
+
+    if (filteredTemplates.length === 0) {
+      console.log(chalk.yellow('No templates found.'));
+      return;
+    }
+
+    const templateToDestroy = await select({
+      message: 'Select a template to destroy:',
+      choices: [
+        ...filteredTemplates.map((template) => ({
+          name: template,
+          value: template,
+        })),
+        { name: 'Cancel', value: 'cancel' },
+      ],
+    });
+
+    if (templateToDestroy === 'cancel') {
+      console.log('Operation cancelled.');
+      return;
+    }
+
+    const confirmDestroy = await select({
+      message: `Are you sure you want to destroy the template "${templateToDestroy}"?`,
+      choices: [
+        { name: 'Yes', value: true },
+        { name: 'No', value: false },
+      ],
+    });
+
+    if (!confirmDestroy) {
+      console.log('Template destruction cancelled.');
+      return;
+    }
+
+    const destroySpinner = ora(
+      `Destroying template "${templateToDestroy}"...`,
+    ).start();
+
+    await TemplateInstance.removeTemplate(templateToDestroy);
+    destroySpinner.succeed(
+      `Template "${templateToDestroy}" destroyed successfully`,
+    );
+  } catch (error) {
+    console.error(
+      `Error listing or destroying templates: ${(error as Error).message}`,
+    );
+  }
+
+  exit(0);
+};
 
 const buildMenuChoices = (services: ServiceType[]) => {
   let options = [{ name: 'Exit', value: 'exit' }];
@@ -27,15 +111,12 @@ const buildMenuChoices = (services: ServiceType[]) => {
   return options.concat(serviceOptions);
 };
 
-type ActionHandler = (
-  config: Config | null,
-  ConfigInstance: ConfigService,
-) => Promise<void> | void;
-
 const Deploy = new DeployService();
 
-const ACTION_HANDLERS: Record<string, ActionHandler> = {
-  upload: async (config, ConfigInstance) => {
+const ACTION_HANDLERS = {
+  create_template: handleCreateTemplate,
+  destroy_template: handleDestroyTemplate,
+  upload: async () => {
     try {
       const selected = await select({
         message: 'Select a service to deploy',
@@ -107,7 +188,7 @@ const ACTION_HANDLERS: Record<string, ActionHandler> = {
       return;
     }
   },
-  list: async (config, ConfigInstance) => {
+  list: async () => {
     try {
       const services = await ConfigInstance.listServices();
       console.log('Services:');
@@ -190,14 +271,12 @@ const ACTION_HANDLERS: Record<string, ActionHandler> = {
   },
 };
 
-export const deploy = async (
-  config: Config | null,
-  confService: ConfigService,
-): Promise<void> => {
+export const deploy = async (): Promise<void> => {
   const action = await select({
     message: 'What do you want to do?',
     choices: MENU_CHOICES,
   });
+  // @ts-ignore
   const handler = ACTION_HANDLERS[action];
-  return await handler(config, confService as ConfigService);
+  return await handler();
 };

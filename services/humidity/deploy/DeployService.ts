@@ -138,6 +138,7 @@ export class DeployService {
       switch (serviceType) {
         case 'aws_upload': {
           // delete the bucket
+          await this.bucketClient!.emptyBucket(service.internal_name);
           await this.bucketClient!.deleteBucket(service.internal_name);
           return this.awsClient!.tearDown(service);
         }
