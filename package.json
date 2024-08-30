@@ -8,7 +8,8 @@
     "test": "jest",
     "prepare": "husky",
     "bundle:fileUploader": "esbuild templates/services/serverless/fileUploader/src/index.ts --bundle --platform=node --target=node14 --outfile=templates/services/serverless/fileUploader/bundle.js",
-    "bundle:database": "esbuild templates/services/serverless/database/src/index.ts --bundle --platform=node --target=node14 --outfile=templates/services/serverless/database/bundle.js"
+    "bundle:database": "esbuild templates/services/serverless/database/src/index.ts --bundle --platform=node --target=node14 --outfile=templates/services/serverless/database/bundle.js",
+    "bundle:coolmang": "esbuild templates/services/serverless/coolmang/src/index.ts --bundle --platform=node --target=node14 --outfile=templates/services/serverless/coolmang/bundle.js"
   },
   "jest": {
     "preset": "ts-jest",

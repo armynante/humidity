@@ -73,6 +73,7 @@ export class BucketService {
    * @throws {Error} If the bucket creation fails.
    */
   async createBucket(bucketName: string): Promise<void> {
+    this.logger.info(`Attempting to create bucket: ${bucketName}`);
     try {
       await this.s3Client.send(new CreateBucketCommand({ Bucket: bucketName }));
       this.logger.info(`Bucket created successfully: ${bucketName}`);

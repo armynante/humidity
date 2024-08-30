@@ -8,7 +8,6 @@ import { select, input, checkbox } from '@inquirer/prompts';
 import chalk from 'chalk';
 import { ServiceTable } from '../helpers/transformers';
 import { DeployInstance, TemplateInstance, ConfigInstance } from './main';
-import { awsUploadService } from '../services/humidity/deploy/AWSUpload';
 import { listEnvs } from '../helpers/config';
 
 const MENU_CHOICES: { name: string; value: string }[] = [
@@ -169,15 +168,21 @@ const ACTION_HANDLERS = {
             message: 'Enter a name for the upload service:',
             validate: (name: string) =>
               name.length > 0 || 'Please enter a name',
-            default: 'aws_upload',
+            default: 'aws-upload',
           });
-          await awsUploadService.uploadService(serviceName);
+          await DeployInstance.deployService(selected, serviceName);
           exit(0);
           break;
         }
-        case 'database': {
-          console.log('Database service not implemented');
-          exit(1);
+        case 'instant_database': {
+          const serviceName = await input({
+            message: 'Enter a name for the database service:',
+            validate: (name: string) =>
+              name.length > 0 || 'Please enter a name',
+            default: 'instant-database',
+          });
+          await DeployInstance.deployService(selected, serviceName);
+          exit(0);
           break;
         }
       }
@@ -246,9 +251,8 @@ const ACTION_HANDLERS = {
           return;
         }
         const deleteSpinner = ora('Deleting service...').start();
-        await DeployInstance.destroyService(service, service.serviceType);
+        await DeployInstance.destroyService(service);
         deleteSpinner.text = 'Service deleted';
-        await ConfigInstance.deleteService(selectedService);
         deleteSpinner.succeed('Config updated successfully');
         exit(0);
         return;

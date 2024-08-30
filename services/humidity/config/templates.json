@@ -4,7 +4,11 @@
     "id": "981c3345-c5c9-4cbe-ac82-2f38d7d96eb7",
     "description": "Upload files to S3",
     "fileLocation": "templates/services/serverless/fileUploader/bundle.js",
-    "requiredKeys": ["AMZ_ID", "AMZ_SEC", "AMZ_REGION"],
+    "requiredKeys": [
+      "AMZ_ID",
+      "AMZ_SEC",
+      "AMZ_REGION"
+    ],
     "internal_name": "aws_upload"
   },
   {
@@ -24,7 +28,24 @@
     "id": "20508c1e-e7c7-48b4-9a35-c8a3ac2b71da",
     "description": "A sqLite database that is deployed to AWS Lambda",
     "fileLocation": "templates/services/serverless/instantDatabase/bundle.js",
-    "requiredKeys": ["AMZ_ID", "AMZ_SEC", "AMZ_REGION"],
+    "requiredKeys": [
+      "AMZ_ID",
+      "AMZ_SEC",
+      "AMZ_REGION"
+    ],
     "internal_name": "instant_database"
+  },
+  {
+    "name": "coolMang",
+    "id": "f85b5e76-c60b-4ecd-89d4-06facb079c7b",
+    "description": "it's cool",
+    "requiredKeys": [
+      "AMZ_ID",
+      "AMZ_SEC",
+      "AMZ_REGION"
+    ],
+    "fileLocation": "templates/services/serverless/coolmang",
+    "internal_name": "coolmang",
+    "deploy_file_location": "services/humidity/deploy/CoolmangService.ts"
   }
 ]

@@ -51,8 +51,8 @@ export class AWSLambdaClient {
   private roleArn: string | null;
   private apiId: string | null;
 
-  constructor(region: string, accessKeyId: string, secretAccessKey: string) {
-    this.region = region;
+  constructor() {
+    this.region = process.env.AMZ_REGION || '';
     this.roleName = 'LambdaExecutionRole';
     this.roleArn = null;
     this.apiId = null;
@@ -60,8 +60,8 @@ export class AWSLambdaClient {
     const config = {
       region: this.region,
       credentials: {
-        accessKeyId: accessKeyId,
-        secretAccessKey: secretAccessKey,
+        accessKeyId: process.env.AMZ_ID || '',
+        secretAccessKey: process.env.AMZ_SEC || '',
       },
     };
 

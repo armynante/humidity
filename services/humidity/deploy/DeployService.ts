@@ -1,116 +1,76 @@
-// @ts-ignore
-import { EnvKeys, type Service } from '../../../types/config.d.ts';
-import { AWSLambdaClient } from '../../serverless/AWSLambdaClient/AWSLambdaClient';
 import {
-  type CreateFunctionConfig,
-  type ServiceType,
-  type TemplateType,
-} from '../../../types/services';
-import { AWSBucketInstance, ConfigInstance } from '../../../cmd/main';
+  EnvKeys,
+  type RequiredEnvs,
+  type Service,
+  // @ts-ignore
+} from '../../../types/config.d.ts';
+import { AWSLambdaClient } from '../../serverless/AWSLambdaClient/AWSLambdaClient';
+import { type CreateFunctionConfig } from '../../../types/services';
+import { ConfigInstance } from '../../../cmd/main';
 import { InstantDatabaseService } from './InstantDatabase.ts';
-
+import { FileSystem } from '../../../cmd/main';
+import { AwsUploadService } from './AWSUpload.ts';
 export class DeployService {
-  private awsClient: AWSLambdaClient | null;
-  private bucketClient: typeof AWSBucketInstance | null;
-
-  constructor() {
-    this.awsClient = null;
-    this.bucketClient = AWSBucketInstance;
-  }
-
-  private async deployAWSUploadService(payload: string, name: string) {
-    // deploy the AWS upload service
-    if (!this.awsClient) {
-      await this.initAWSClient();
+  // Look up the service in the config and returns the template
+  findServiceTemplateByInternalName = (serviceName: string | undefined) => {
+    if (!serviceName) {
+      throw new Error('No service provided');
     }
-
-    try {
-      const buckets = await this.bucketClient!.listBuckets();
-      if (!buckets || !buckets.includes(name)) {
-        await this.bucketClient!.createBucket(name);
-        console.log(`Bucket ${name} created successfully.`);
-      } else {
-        console.log(`Bucket ${name} already exists.`);
-      }
-    } catch (error) {
-      console.error(`Error managing bucket: ${error}`);
-      throw new Error('Failed to manage bucket');
-    }
-
-    // create the lambda function
-    const FuncConfig: CreateFunctionConfig = {
-      name,
-      code: payload,
-      environment: {
-        AMZ_REGION: process.env.AMZ_REGION || '',
-        AMZ_ID: process.env.AMZ_ID || '',
-        AMZ_SEC: process.env.AMZ_SEC || '',
-        BUCKET_NAME: name,
-      },
-    };
-
-    const lambdaConfig =
-      await this.awsClient!.createOrUpdateFunction(FuncConfig);
-
-    // if there is no lambda config, throw an error
-    if (!lambdaConfig) {
-      throw new Error('Failed to deploy service');
-    }
-    return lambdaConfig;
-  }
-
-  private async initAWSClient() {
-    // initialize the AWS client
-    const AMZ_REGION = process.env.AWS_REGION;
-    const AMZ_ID = process.env.AMZ_ID;
-    const AMZ_SEC = process.env.AMZ_SEC;
-
-    if (!AMZ_REGION || !AMZ_ID || !AMZ_SEC) {
-      throw new Error('AWS credentials not found');
-    }
-    if (!this.awsClient) {
-      this.awsClient = new AWSLambdaClient(AMZ_REGION, AMZ_ID, AMZ_SEC);
-    }
-  }
-
-  findService = (service: string) => {
     const templates = ConfigInstance.getTemplates();
-    return templates.find((s) => s.internal_name === service);
+    return templates.find((s) => s.internal_name === serviceName);
   };
 
-  async deployService(service: string, payload: string, name: string) {
+  // Find the service, read the payload, and deploy the service
+  async deployService(service: string, name: string) {
+    const template = this.findServiceTemplateByInternalName(service);
+    if (!template) {
+      throw new Error('Service template not found');
+    }
+    const payload = await FileSystem.readFile(template.fileLocation, 'utf-8');
+    if (!payload) {
+      throw new Error('Template not found');
+    }
+
+    // Pull list of required environment variables
+    const requiredEnvVars = template.requiredKeys as (keyof RequiredEnvs)[];
+
+    // Check if the required environment variables are set
+    const validEnvs = ConfigInstance.checkEnvVars(requiredEnvVars);
+
+    if (!validEnvs) {
+      throw new Error('Missing required environment variables');
+    }
+
     // deploy the service
     switch (service) {
       case 'aws_upload':
-        return this.deployAWSUploadService(payload, name);
+        const awsUploadService = new AwsUploadService(payload);
+        return awsUploadService.up(name);
       case 'instant_database':
-        const dbService = new InstantDatabaseService();
-        return dbService.deployService(name);
+        const dbService = new InstantDatabaseService(payload);
+        return dbService.up(name);
       default:
         throw new Error('Invalid service');
     }
   }
 
-  async destroyService(service: Service, serviceType: string) {
+  async destroyService(service: Service) {
     try {
-      if (!this.awsClient) {
-        await this.initAWSClient();
-      }
+      // check if the service is exists
+      const serviceConfig = await ConfigInstance.viewService(service.id);
 
       // destroy the service
-      switch (serviceType) {
+      switch (serviceConfig.serviceType) {
         case 'aws_upload': {
-          // delete the bucket
-          await this.bucketClient!.emptyBucket(service.internal_name);
-          await this.bucketClient!.deleteBucket(service.internal_name);
-          return this.awsClient!.tearDown(service);
+          const awsUploadService = new AwsUploadService();
+          return awsUploadService.down(service.id);
         }
         case 'instant_database': {
           const dbService = new InstantDatabaseService();
-          return dbService.destroyService(service.internal_name);
+          return dbService.down(service.id);
         }
         default:
-          this;
+          throw new Error('Invalid service');
       }
     } catch (error) {
       console.error(error);

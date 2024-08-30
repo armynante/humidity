@@ -6,13 +6,11 @@ import listProjects from '../cmd/listProjects';
 import { settings } from '../cmd/settings';
 import type { ActionType } from '../types/commands';
 import { ConfigService } from '../services/humidity/config/ConfigService';
-import { showErrorAndExit } from '../helpers/transformers';
 import { deploy } from './deployService';
 import { FileSystemWrapper } from '../helpers/filesystem';
 import { Logger } from '../helpers/logger';
 import { TemplateService } from '../services/humidity/templates/TemplateService';
 import { DeployService } from '../services/humidity/deploy/DeployService';
-import { BucketService } from '../services/storage/AWS/AWSBucketService';
 const MENU_CHOICES: { name: string; value: ActionType }[] = [
   { name: 'Create a new project ✨', value: 'new' },
   { name: 'Manage projects 🗂️', value: 'ls' },
@@ -46,10 +44,9 @@ const ACTION_HANDLERS: Record<ActionType, any> = {
 };
 
 export const logger = new Logger('EXT_DEBUG');
-const fs = new FileSystemWrapper();
-export const ConfigInstance = new ConfigService(fs, logger);
-export const TemplateInstance = new TemplateService(fs, logger);
-export const AWSBucketInstance = new BucketService();
+export const FileSystem = new FileSystemWrapper();
+export const ConfigInstance = new ConfigService(FileSystem, logger);
+export const TemplateInstance = new TemplateService(FileSystem, logger);
 export const DeployInstance = new DeployService();
 export const main = async (): Promise<void> => {
   displayLogo();

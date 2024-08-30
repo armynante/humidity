@@ -55,6 +55,7 @@ export const TemplateSchema = z.object({
   requiredKeys: z.array(z.string()),
   fileLocation: z.string(),
   internal_name: z.string(),
+  deploy_file_location: z.string(),
 });
 
 export const ConfigSchema = z.object({

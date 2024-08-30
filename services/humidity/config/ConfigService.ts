@@ -134,6 +134,15 @@ export class ConfigService {
     }
   }
 
+  checkEnvVars(requiredEnvVars: (keyof RequiredEnvs)[]): boolean {
+    for (const envVar of requiredEnvVars) {
+      if (!process.env[envVar]) {
+        return false;
+      }
+    }
+    return true;
+  }
+
   async buildEnvFile(envPath: string, envs: RequiredEnvs): Promise<void> {
     try {
       const resolvedPath = envPath.replace('~', homedir());
@@ -262,6 +271,14 @@ export class ConfigService {
       throw new Error('Config does not exist');
     }
     this.config.templates.push(template);
+
+    // Update the template.json file with the new template
+    const templates = await this.loadTemplates();
+    templates.push(template);
+    await this.fs.writeFile(
+      path.join(__dirname, 'templates.json'),
+      JSON.stringify(templates, null, 2),
+    );
     await this.saveConfig();
   }
 
@@ -272,6 +289,13 @@ export class ConfigService {
     }
     this.config.templates = this.config.templates.filter(
       (t) => t.id !== templateId,
+    );
+    // remove the template from the template.json file
+    const templates = await this.loadTemplates();
+    const updatedTemplates = templates.filter((t) => t.id !== templateId);
+    await this.fs.writeFile(
+      path.join(__dirname, 'templates.json'),
+      JSON.stringify(updatedTemplates, null, 2),
     );
     await this.saveConfig();
   }

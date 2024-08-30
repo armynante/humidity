@@ -1,65 +1,53 @@
 import fs from 'fs/promises';
 import { randomUUID } from 'crypto';
-import {
-  DeployInstance,
-  ConfigInstance,
-  AWSBucketInstance,
-} from '../../../cmd/main';
+import { ConfigInstance } from '../../../cmd/main';
 import type { Service } from '../../../types/config';
 import ora from 'ora';
 import { ServiceTable } from '../../../helpers/transformers';
 import { Logger } from '../../../helpers/logger';
+import { AWSLambdaClient } from '../../serverless/AWSLambdaClient/AWSLambdaClient';
+import { BucketService } from '../../storage/AWS/AWSBucketService';
 
 export class InstantDatabaseService {
   private logger = new Logger('EXT_DEBUG', 'InstantDatabaseService');
 
-  async deployService(serviceName: string): Promise<void> {
+  constructor(private payload?: string) {
+    this.payload = payload;
+  }
+
+  async up(serviceName: string): Promise<void> {
     const deploySpinner = ora('Deploying Instant Database...').start();
 
     try {
       // Find the service
-      const payloadPath =
-        DeployInstance.findService('instant_database')?.fileLocation;
-      if (!payloadPath) {
+      if (!this.payload) {
         deploySpinner.fail('Service template not found');
         return;
       }
 
-      // Read the payload
-      deploySpinner.text = 'Reading template...';
-      const payload = await fs.readFile(payloadPath, 'utf-8');
-      if (!payload) {
-        deploySpinner.fail('Template not found');
-        return;
-      }
-
-      // Create a bucket
-      const bucketName = `instant-db-${randomUUID()}`;
-      deploySpinner.text = `Creating bucket: ${bucketName}...`;
-      await AWSBucketInstance.createBucket(bucketName);
-      this.logger.info(`Bucket created: ${bucketName}`);
-
-      // Deploy the service
-      deploySpinner.text = 'Deploying database service...';
+      // Create a uuid
       const uuid = randomUUID();
       const internalName = serviceName + '-' + uuid;
-      const lambdaConfig = await DeployInstance.deployService(
-        'instant_database',
-        payload,
-        internalName,
-      );
 
-      if (!lambdaConfig) {
-        deploySpinner.fail('Failed to deploy database service');
-        return;
-      }
+      // Create a bucket
+      deploySpinner.text = `Creating bucket: ${internalName}...`;
+      const bucketClient = new BucketService();
+      await bucketClient.createBucket(internalName);
+      deploySpinner.succeed(`Bucket created: ${internalName}`);
 
-      // Update config
+      // Deploy the service
+      const awsLambdaClient = new AWSLambdaClient();
+      const lambdaConfig = await awsLambdaClient.createOrUpdateFunction({
+        name: internalName,
+        code: this.payload,
+      });
+
+      // Create config
       deploySpinner.text = 'Updating config with uuid: ' + uuid;
       const serviceConfig: Service = {
         name: serviceName,
         internal_name: internalName,
-        config: { ...lambdaConfig, bucketName },
+        config: { ...lambdaConfig, internalName },
         url: lambdaConfig.url,
         id: uuid,
         apiId: lambdaConfig.apiId,
@@ -78,7 +66,7 @@ export class InstantDatabaseService {
     }
   }
 
-  async destroyService(serviceId: string): Promise<void> {
+  async down(serviceId: string): Promise<void> {
     const destroySpinner = ora(
       'Destroying Instant Database service...',
     ).start();
@@ -93,14 +81,19 @@ export class InstantDatabaseService {
 
       // Destroy the Lambda function and API Gateway
       destroySpinner.text = 'Removing Lambda function and API Gateway...';
-      await DeployInstance.destroyService(service, 'instant_database');
+      const awsLambdaClient = new AWSLambdaClient();
+      await awsLambdaClient.tearDown(service);
+      destroySpinner.text = 'Lambda function and API Gateway removed';
 
       // Delete the associated S3 bucket
       if (service.config.bucketName) {
         destroySpinner.text = `Deleting bucket: ${service.config.bucketName}...`;
-        await AWSBucketInstance.deleteBucket(service.config.bucketName);
+        const bucketClient = new BucketService();
+        await bucketClient.deleteBucket(service.config.bucketName);
         this.logger.info(`Bucket deleted: ${service.config.bucketName}`);
-        destroySpinner.succeed(`Bucket deleted: ${service.config.bucketName}`);
+        destroySpinner.text = `Bucket deleted: ${service.config.bucketName}`;
+      } else {
+        destroySpinner.fail('Bucket name not found');
       }
 
       // Remove the service from the configuration
@@ -113,5 +106,3 @@ export class InstantDatabaseService {
     }
   }
 }
-
-export const instantDatabaseService = new InstantDatabaseService();

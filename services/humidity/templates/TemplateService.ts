@@ -6,12 +6,12 @@ import type { TemplateType } from '../../../types/services';
 import { randomUUID } from 'node:crypto';
 import type { EnvKeys } from '../../../types/config';
 import { ConfigInstance } from '../../../cmd/main';
+import { createDeployTemplate } from './blankDeployClass';
 
 export class TemplateService {
   private templatesPath: string;
   private fs: FileSystemWrapper;
   private logger: Logger;
-
   constructor(fs: FileSystemWrapper, logger: Logger) {
     this.templatesPath = path.join('.', 'templates', 'services', 'serverless');
     this.fs = fs;
@@ -38,7 +38,12 @@ export class TemplateService {
         'console.log("Hello from ' + templateName + '");',
       );
 
-      this.logger.info(`Template "${templateName}" created successfully.`);
+      this.logger.info(
+        `Template files for "${templateName}" created successfully.`,
+      );
+
+      // Generate the deploy class
+      const fileName = await this.generateDeployClass(shortName);
 
       // Create a template object and save it to the config
       const template: TemplateType = {
@@ -48,10 +53,18 @@ export class TemplateService {
         requiredKeys: requiredEnvs,
         fileLocation: templatePath,
         internal_name: shortName,
+        deploy_file_location: path.join(
+          '.',
+          'services',
+          'humidity',
+          'deploy',
+          fileName,
+        ),
       };
 
       // Insert the template into the config
       await ConfigInstance.addTemplate(template);
+
       // Update package.json with esbuild command
       await this.updatePackageJson(shortName, 'add');
 
@@ -60,6 +73,21 @@ export class TemplateService {
       this.logger.error(`Error creating template "${templateName}"`, error);
       throw error;
     }
+  }
+
+  private async generateDeployClass(templateName: string): Promise<string> {
+    const { payload, fileName } = createDeployTemplate(templateName);
+
+    // create the file
+    const deployPath = path.join(
+      '.',
+      'services',
+      'humidity',
+      'deploy',
+      fileName,
+    );
+    await this.fs.writeFile(deployPath, payload);
+    return fileName;
   }
 
   async removeTemplate(templateId: string): Promise<void> {
@@ -85,6 +113,12 @@ export class TemplateService {
 
         // Update package.json to remove the esbuild command
         await this.updatePackageJson(template.internal_name, 'remove');
+
+        // Remove the deploy.ts file
+        await this.fs.rm(template.deploy_file_location, {
+          recursive: true,
+          force: true,
+        });
       } else {
         this.logger.warn(`Template "${template.name}" does not exist.`);
       }

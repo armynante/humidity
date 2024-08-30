@@ -8,6 +8,7 @@ export interface TemplateType {
   requiredKeys: string[]; // The keys that are required to be set in the config to use the template
   fileLocation: string; // The location of the template file to be deployed
   internal_name: string; // the name used to reference the template in the config
+  deploy_file_location: string; // The location of the deploy file to be deployed
 }
 
 export interface ServiceType extends TemplateType {
