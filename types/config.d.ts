@@ -1,7 +1,9 @@
 import type { UUID } from 'node:crypto';
 import { DoAppSpec } from './do';
 import { ServiceType } from './service';
+import type { TemplateType } from './services';
 
+// A Project is an empty repo that can be deployed using a specific language/framework
 export interface Project {
   name: string;
   id: UUID;
@@ -26,8 +28,12 @@ export interface Config {
   envPath: string;
   projects: Project[];
   services: Service[];
+  templates: TemplateType[];
 }
 
+// A Service is an instance of a template that has been deployed
+// It is different from a Project. It is meant to be a reusable component
+// us
 export interface Service {
   name: string;
   internal_name: string;
@@ -40,17 +46,32 @@ export interface Service {
   serviceType: ServiceType;
 }
 
+// ... existing code ...
+
+export enum EnvKeys {
+  GH_USERNAME = 'GH_USERNAME',
+  GH_TOKEN = 'GH_TOKEN',
+  DO_REGISTRY_NAME = 'DO_REGISTRY_NAME',
+  DO_API_TOKEN = 'DO_API_TOKEN',
+  DO_SPACES_REGION = 'DO_SPACES_REGION',
+  DO_SPACES_ACCESS_KEY = 'DO_SPACES_ACCESS_KEY',
+  DO_SPACES_SECRET_KEY = 'DO_SPACES_SECRET_KEY',
+  AMZ_ID = 'AMZ_ID',
+  AMZ_SEC = 'AMZ_SEC',
+  AMZ_REGION = 'AMZ_REGION',
+}
+
 export interface RequiredEnvs {
-  GH_USERNAME?: string;
-  GH_TOKEN?: string;
-  DO_REGISTRY_NAME?: string;
-  DO_API_TOKEN?: string;
-  DO_SPACES_REGION?: string;
-  DO_SPACES_ACCESS_KEY?: string;
-  DO_SPACES_SECRET_KEY?: string;
-  AMZ_ID?: string;
-  AMZ_SEC?: string;
-  AMZ_REGION?: string;
+  [EnvKeys.GH_USERNAME]?: string;
+  [EnvKeys.GH_TOKEN]?: string;
+  [EnvKeys.DO_REGISTRY_NAME]?: string;
+  [EnvKeys.DO_API_TOKEN]?: string;
+  [EnvKeys.DO_SPACES_REGION]?: string;
+  [EnvKeys.DO_SPACES_ACCESS_KEY]?: string;
+  [EnvKeys.DO_SPACES_SECRET_KEY]?: string;
+  [EnvKeys.AMZ_ID]?: string;
+  [EnvKeys.AMZ_SEC]?: string;
+  [EnvKeys.AMZ_REGION]?: string;
 }
 
 export enum EnvKeys {

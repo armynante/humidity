@@ -1,4 +1,4 @@
-import { BucketClient } from './AWSBucketClient';
+import { BucketClient } from './AWSBucketService';
 import fs from 'fs';
 import path from 'path';
 

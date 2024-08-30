@@ -46,11 +46,23 @@ export const ServiceSchema = z.object({
   apiId: z.string(),
 });
 
+export const TemplateSchema = z.object({
+  name: z.string(),
+  id: z.string().refine((id): id is UUID => uuidRegex.test(id), {
+    message: 'Invalid UUID',
+  }),
+  description: z.string(),
+  requiredKeys: z.array(z.string()),
+  fileLocation: z.string(),
+  internal_name: z.string(),
+});
+
 export const ConfigSchema = z.object({
   projects: z.array(ProjectSchema),
   useEnvFile: z.boolean(),
   envPath: z.string(),
   services: z.array(ServiceSchema),
+  templates: z.array(TemplateSchema),
 });
 
 // Exporting types inferred from the schemas

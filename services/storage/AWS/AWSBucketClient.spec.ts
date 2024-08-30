@@ -1,5 +1,5 @@
 import { expect, test, mock, jest } from 'bun:test';
-import { BucketClient } from './AWSBucketClient';
+import { BucketClient } from './AWSBucketService';
 import {
   S3Client,
   CreateBucketCommand,

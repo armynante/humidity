@@ -2,6 +2,10 @@ import { homedir } from 'os';
 import path from 'path';
 import { FileSystemWrapper } from '../../../helpers/filesystem';
 import { Logger } from '../../../helpers/logger';
+import type { TemplateType } from '../../../types/services';
+import { randomUUID } from 'node:crypto';
+import type { EnvKeys } from '../../../types/config';
+import { ConfigInstance } from '../../../cmd/main';
 
 export class TemplateService {
   private templatesPath: string;
@@ -14,9 +18,14 @@ export class TemplateService {
     this.logger = logger;
   }
 
-  async createTemplate(templateName: string): Promise<void> {
+  async createTemplate(
+    templateName: string,
+    templateDescription: string,
+    shortName: string,
+    requiredEnvs: EnvKeys[],
+  ): Promise<TemplateType> {
     try {
-      const templatePath = path.join(this.templatesPath, templateName);
+      const templatePath = path.join(this.templatesPath, shortName);
       const srcPath = path.join(templatePath, 'src');
 
       // Create template directory and src subdirectory
@@ -31,33 +40,62 @@ export class TemplateService {
 
       this.logger.info(`Template "${templateName}" created successfully.`);
 
+      // Create a template object and save it to the config
+      const template: TemplateType = {
+        name: templateName,
+        id: randomUUID(),
+        description: templateDescription,
+        requiredKeys: requiredEnvs,
+        fileLocation: templatePath,
+        internal_name: shortName,
+      };
+
+      // Insert the template into the config
+      await ConfigInstance.addTemplate(template);
       // Update package.json with esbuild command
-      await this.updatePackageJson(templateName, 'add');
+      await this.updatePackageJson(shortName, 'add');
+
+      return template;
     } catch (error) {
       this.logger.error(`Error creating template "${templateName}"`, error);
       throw error;
     }
   }
 
-  async removeTemplate(templateName: string): Promise<void> {
+  async removeTemplate(templateId: string): Promise<void> {
     try {
-      const templatePath = path.join(this.templatesPath, templateName);
+      const template = await ConfigInstance.getTemplateById(templateId);
+
+      if (!template) {
+        this.logger.warn(`Template "${templateId}" does not exist.`);
+        return;
+      }
+
+      const templatePath = path.join(
+        this.templatesPath,
+        template.internal_name,
+      );
 
       // Check if the template directory exists
       if (await this.fs.exists(templatePath)) {
         // Remove the template directory and all its contents
+        await ConfigInstance.removeTemplate(templateId);
         await this.fs.rm(templatePath, { recursive: true, force: true });
-        this.logger.info(`Template "${templateName}" removed successfully.`);
+        this.logger.info(`Template "${template.name}" removed successfully.`);
 
         // Update package.json to remove the esbuild command
-        await this.updatePackageJson(templateName, 'remove');
+        await this.updatePackageJson(template.internal_name, 'remove');
       } else {
-        this.logger.warn(`Template "${templateName}" does not exist.`);
+        this.logger.warn(`Template "${template.name}" does not exist.`);
       }
     } catch (error) {
-      this.logger.error(`Error removing template "${templateName}"`, error);
+      this.logger.error(`Error removing template "${templateId}"`, error);
       throw error;
     }
+  }
+
+  async getTemplateById(templateId: string): Promise<TemplateType | null> {
+    return ConfigInstance.getTemplateById(templateId);
   }
 
   private async updatePackageJson(

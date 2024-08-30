@@ -1,6 +1,6 @@
 import express from 'express';
 import serverless from 'serverless-http';
-import { BucketClient } from '../../../../../services/storage/AWS/AWSBucketClient';
+import { BucketClient } from '../../../../../services/storage/AWS/AWSBucketService.ts';
 // @ts-ignore
 import { type BucketClientConfig } from '../../../../../types/buckets.d.ts';
 import * as dotenv from 'dotenv';

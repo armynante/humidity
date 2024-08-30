@@ -1,8 +1,7 @@
 import { select } from '@inquirer/prompts';
-import chalk from 'chalk';
 import { exit } from 'process';
 import { displayLogo } from '../helpers/art';
-import createProject from '../cmd/newProject';
+import createProject from './newProject';
 import listProjects from '../cmd/listProjects';
 import { settings } from '../cmd/settings';
 import type { ActionType } from '../types/commands';
@@ -12,7 +11,8 @@ import { deploy } from './deployService';
 import { FileSystemWrapper } from '../helpers/filesystem';
 import { Logger } from '../helpers/logger';
 import { TemplateService } from '../services/humidity/templates/TemplateService';
-
+import { DeployService } from '../services/humidity/deploy/DeployService';
+import { BucketService } from '../services/storage/AWS/AWSBucketService';
 const MENU_CHOICES: { name: string; value: ActionType }[] = [
   { name: 'Create a new project ✨', value: 'new' },
   { name: 'Manage projects 🗂️', value: 'ls' },
@@ -49,7 +49,8 @@ export const logger = new Logger('EXT_DEBUG');
 const fs = new FileSystemWrapper();
 export const ConfigInstance = new ConfigService(fs, logger);
 export const TemplateInstance = new TemplateService(fs, logger);
-
+export const AWSBucketInstance = new BucketService();
+export const DeployInstance = new DeployService();
 export const main = async (): Promise<void> => {
   displayLogo();
 

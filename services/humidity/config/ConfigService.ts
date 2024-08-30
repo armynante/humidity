@@ -11,14 +11,10 @@ import type {
   RequiredEnvs,
   Service,
 } from '../../../types/config';
-import {
-  ConfigSchema,
-  ProjectSchema,
-  RequiredEnvsSchema,
-  ServiceSchema,
-} from '../../../schemas/config';
+import { ConfigSchema, RequiredEnvsSchema } from '../../../schemas/config';
 import { FileSystemWrapper } from '../../../helpers/filesystem';
 import { Logger } from '../../../helpers/logger';
+import type { TemplateType } from '../../../types/services';
 
 export class ConfigService {
   private config: Config | null = null;
@@ -26,7 +22,6 @@ export class ConfigService {
   private envPath: string;
   private fs: FileSystemWrapper;
   private logger: Logger;
-
   constructor(fs: FileSystemWrapper, logger: Logger) {
     this.configPath = path.join(homedir(), '.humidity', 'config.json');
     this.envPath = path.join(homedir(), '.humidity', '.env.humidity');
@@ -60,12 +55,26 @@ export class ConfigService {
     }
   }
 
-  private initializeConfig(): Config {
+  // load templates
+  private async loadTemplates(): Promise<TemplateType[]> {
+    if (!this.config) {
+      throw new Error('Config does not exist');
+    }
+    const templateFile = await this.fs.readFile(
+      path.join(__dirname, 'templates.json'),
+      'utf-8',
+    );
+    return JSON.parse(templateFile);
+  }
+
+  private async initializeConfig(): Promise<Config> {
+    const templates = await this.loadTemplates();
     return {
       projects: [],
       useEnvFile: false,
       envPath: '',
       services: [],
+      templates: templates,
     };
   }
 
@@ -147,6 +156,13 @@ export class ConfigService {
     }
   }
 
+  getTemplates(): TemplateType[] {
+    if (!this.config) {
+      throw new Error('Config does not exist');
+    }
+    return this.config.templates;
+  }
+
   async init(): Promise<[boolean, Config]> {
     try {
       const exists = await this.fs.exists(this.configPath);
@@ -157,7 +173,7 @@ export class ConfigService {
       }
 
       this.logger.info('Creating new config');
-      this.config = this.initializeConfig();
+      this.config = await this.initializeConfig();
       await this.fs.mkdir(path.dirname(this.configPath), { recursive: true });
       await this.saveConfig();
       this.logger.info(`Config created at ${this.configPath}`);
@@ -215,6 +231,14 @@ export class ConfigService {
     return project;
   }
 
+  async getTemplateById(templateId: string): Promise<TemplateType | null> {
+    await this.load();
+    if (!this.config) {
+      throw new Error('Config does not exist');
+    }
+    return this.config.templates.find((t) => t.id === templateId) || null;
+  }
+
   async updateConfig(
     updates: Partial<Config>,
   ): Promise<[Partial<Config> | null, string | null]> {
@@ -230,6 +254,26 @@ export class ConfigService {
     Object.assign(this.config, updates);
     await this.saveConfig();
     return [this.config, null];
+  }
+
+  async addTemplate(template: TemplateType): Promise<void> {
+    await this.load();
+    if (!this.config) {
+      throw new Error('Config does not exist');
+    }
+    this.config.templates.push(template);
+    await this.saveConfig();
+  }
+
+  async removeTemplate(templateId: string): Promise<void> {
+    await this.load();
+    if (!this.config) {
+      throw new Error('Config does not exist');
+    }
+    this.config.templates = this.config.templates.filter(
+      (t) => t.id !== templateId,
+    );
+    await this.saveConfig();
   }
 
   async addService(service: Service): Promise<void> {

@@ -17,6 +17,7 @@ import { S3ServiceException } from '@aws-sdk/client-s3';
 import fs from 'fs';
 import { Readable } from 'stream';
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
+import { Logger } from '../../../helpers/logger';
 
 /**
  * Configuration interface for the BucketClient.
@@ -35,9 +36,10 @@ interface BucketClientConfig {
  * A client for interacting with AWS S3 buckets.
  * @class BucketClient
  */
-export class BucketClient {
+export class BucketService {
   private s3Client: S3Client;
   public region: string;
+  private logger: Logger;
 
   /**
    * Creates an instance of BucketClient.
@@ -60,7 +62,8 @@ export class BucketClient {
     };
 
     this.s3Client = new S3Client(clientConfig);
-    console.log('S3Client created');
+    this.logger = new Logger('INFO'); // Changed from 'AWSBucketService' to 'INFO'
+    this.logger.info('S3Client created');
   }
 
   /**
@@ -72,16 +75,16 @@ export class BucketClient {
   async createBucket(bucketName: string): Promise<void> {
     try {
       await this.s3Client.send(new CreateBucketCommand({ Bucket: bucketName }));
-      console.log(`Bucket created successfully: ${bucketName}`);
+      this.logger.info(`Bucket created successfully: ${bucketName}`);
       await this.setCORSConfiguration(bucketName, ['*']);
     } catch (error: any) {
       if (
         error.name === 'BucketAlreadyExists' ||
         error.name === 'BucketAlreadyOwnedByYou'
       ) {
-        console.log(`Bucket already exists: ${bucketName}`);
+        this.logger.warn(`Bucket already exists: ${bucketName}`);
       } else {
-        console.error(`Error creating bucket: ${error.message}`);
+        this.logger.error(`Error creating bucket: ${error.message}`);
         throw error;
       }
     }
@@ -94,7 +97,7 @@ export class BucketClient {
    * @throws {Error} If emptying the bucket fails.
    */
   async emptyBucket(bucketName: string): Promise<void> {
-    console.log(`Attempting to empty bucket: ${bucketName}`);
+    this.logger.info(`Attempting to empty bucket: ${bucketName}`);
 
     try {
       let continuationToken: string | undefined;
@@ -127,15 +130,17 @@ export class BucketClient {
           const deleteCommand = new DeleteObjectsCommand(deleteParams);
           await this.s3Client.send(deleteCommand);
 
-          console.log(`Deleted ${deleteParams.Delete.Objects.length} objects`);
+          this.logger.info(
+            `Deleted ${deleteParams.Delete.Objects.length} objects`,
+          );
         }
 
         continuationToken = listedObjects.NextContinuationToken;
       } while (continuationToken);
 
-      console.log(`Successfully emptied bucket: ${bucketName}`);
+      this.logger.info(`Successfully emptied bucket: ${bucketName}`);
     } catch (error) {
-      console.error(`Error emptying bucket: ${error}`);
+      this.logger.error(`Error emptying bucket: ${error}`);
       throw error;
     }
   }
@@ -155,9 +160,9 @@ export class BucketClient {
       }
     } catch (error) {
       if (error instanceof S3ServiceException) {
-        console.error(`Error listing buckets: ${error.message}`);
+        this.logger.error(`Error listing buckets: ${error.message}`);
       } else {
-        console.error('An unexpected error occurred:', error);
+        this.logger.error('An unexpected error occurred:', error);
       }
     }
   }
@@ -170,12 +175,12 @@ export class BucketClient {
   async deleteBucket(bucketName: string): Promise<void> {
     try {
       await this.s3Client.send(new DeleteBucketCommand({ Bucket: bucketName }));
-      console.log(`Bucket deleted successfully: ${bucketName}`);
+      this.logger.info(`Bucket deleted successfully: ${bucketName}`);
     } catch (error) {
       if (error instanceof S3ServiceException) {
-        console.error(`Error deleting bucket: ${error.message}`);
+        this.logger.error(`Error deleting bucket: ${error.message}`);
       } else {
-        console.error('An unexpected error occurred:', error);
+        this.logger.error('An unexpected error occurred:', error);
       }
     }
   }
@@ -195,7 +200,7 @@ export class BucketClient {
     fileContent: Buffer | Readable,
     contentType: string,
   ): Promise<void> {
-    console.log(
+    this.logger.info(
       `Attempting to upload file: ${fileName} to bucket: ${bucketName}`,
     );
     try {
@@ -224,7 +229,7 @@ export class BucketClient {
       const command = new PutObjectCommand(params);
       const response = await this.s3Client.send(command);
 
-      console.log(`File uploaded successfully: ${fileName}`, response);
+      this.logger.info(`File uploaded successfully: ${fileName}`, response);
 
       // Verify the uploaded file
       const getObjectCommand = new GetObjectCommand({
@@ -233,22 +238,22 @@ export class BucketClient {
       });
       const { ContentLength, ContentType: uploadedContentType } =
         await this.s3Client.send(getObjectCommand);
-      console.log(
+      this.logger.info(
         `Verified uploaded file: Size=${ContentLength}, Type=${uploadedContentType}`,
       );
 
       if (ContentLength !== body.length) {
-        console.warn(
+        this.logger.warn(
           `File size mismatch. Uploaded: ${ContentLength}, Original: ${body.length}`,
         );
       }
       if (uploadedContentType !== contentType) {
-        console.warn(
+        this.logger.warn(
           `Content type mismatch. Uploaded: ${uploadedContentType}, Original: ${contentType}`,
         );
       }
     } catch (error) {
-      console.error('Error during file upload:', error);
+      this.logger.error('Error during file upload:', error);
       throw error;
     }
   }
@@ -306,11 +311,11 @@ export class BucketClient {
       });
 
       await this.s3Client.send(command);
-      console.log(
+      this.logger.info(
         `CORS configuration set successfully for bucket: ${bucketName}`,
       );
     } catch (error) {
-      console.error(`Error setting CORS configuration: ${error}`);
+      this.logger.error(`Error setting CORS configuration: ${error}`);
       throw error;
     }
   }
@@ -319,7 +324,7 @@ export class BucketClient {
     bucketName: string,
     fileName: string,
   ): Promise<{ content: Buffer; contentType: string }> {
-    console.log(
+    this.logger.info(
       `Attempting to download file: ${fileName} from bucket: ${bucketName}`,
     );
     try {
@@ -336,7 +341,7 @@ export class BucketClient {
           chunks.push(chunk);
         }
         const content = Buffer.concat(chunks);
-        console.log(
+        this.logger.info(
           `File downloaded successfully: ${fileName}, Size: ${content.length}, Type: ${response.ContentType}`,
         );
         return {
@@ -347,7 +352,7 @@ export class BucketClient {
         throw new Error('Unexpected response body type');
       }
     } catch (error) {
-      console.error('Error during file download:', error);
+      this.logger.error('Error during file download:', error);
       throw error;
     }
   }
@@ -366,12 +371,12 @@ export class BucketClient {
       });
 
       await this.s3Client.send(command);
-      console.log(`File deleted successfully: ${filePath}`);
+      this.logger.info(`File deleted successfully: ${filePath}`);
     } catch (error) {
       if (error instanceof S3ServiceException) {
-        console.error(`Error deleting file: ${error.message}`);
+        this.logger.error(`Error deleting file: ${error.message}`);
       } else {
-        console.error('An unexpected error occurred:', error);
+        this.logger.error('An unexpected error occurred:', error);
       }
     }
   }

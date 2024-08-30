@@ -2,11 +2,13 @@ import { mkdir } from 'node:fs/promises';
 import { select, input, confirm } from '@inquirer/prompts';
 import chalk from 'chalk';
 import DigitalOceanService from '../services/compute/DigitalOceanClient/DigitalOceanClient';
-import type {
-  NewProjectQuestions,
-  GHSecret,
-  ProjectType,
-} from '../types/config';
+import {
+  type NewProjectQuestions,
+  type GHSecret,
+  type ProjectType,
+  EnvKeys,
+  // @ts-ignore
+} from '../types/config.d.ts';
 import type { DoAppSpec } from '../types/do';
 import ora from 'ora';
 import { projectTable } from '../helpers/transformers';
@@ -18,7 +20,6 @@ import {
   copyTsStarterFiles,
 } from '../helpers/newProject';
 import GitHub from '../helpers/github';
-import type { ConfigService } from '../services/humidity/config/ConfigService';
 import { ConfigInstance } from './main';
 
 interface Config {
@@ -183,12 +184,15 @@ const setupVersionControl = async (
         // Check if the user has a GitHub token
         const config = await ConfigInstance.load();
         const [validFile, missingEnvVars] =
-          await ConfigInstance.validateEnvFile(['GH_USERNAME', 'GH_TOKEN']);
+          await ConfigInstance.validateEnvFile([
+            EnvKeys.GH_USERNAME,
+            EnvKeys.GH_TOKEN,
+          ]);
 
         if (
           !validFile &&
-          missingEnvVars.includes('GH_USERNAME') &&
-          missingEnvVars.includes('GH_TOKEN')
+          missingEnvVars.includes(EnvKeys.GH_USERNAME) &&
+          missingEnvVars.includes(EnvKeys.GH_TOKEN)
         ) {
           console.log(
             chalk.yellow(
@@ -293,14 +297,14 @@ const setupCloudDeployment = async (
     // Check if the user has a DigitalOcean token
     const config = await ConfigInstance.load();
     const [validFile, missingEnvVars] = await ConfigInstance.validateEnvFile([
-      'DO_API_TOKEN',
-      'DO_REGISTRY_NAME',
+      EnvKeys.DO_API_TOKEN,
+      EnvKeys.DO_REGISTRY_NAME,
     ]);
 
     if (
       !validFile &&
-      missingEnvVars.includes('DO_API_TOKEN') &&
-      missingEnvVars.includes('DO_REGISTRY_NAME')
+      missingEnvVars.includes(EnvKeys.DO_API_TOKEN) &&
+      missingEnvVars.includes(EnvKeys.DO_REGISTRY_NAME)
     ) {
       console.log(
         chalk.yellow(

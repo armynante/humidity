@@ -12,9 +12,11 @@ enum LogLevel {
 
 export class Logger {
   private level: LogLevel;
+  private serviceName: string;
 
-  constructor(level: keyof typeof LogLevel = 'INFO') {
+  constructor(level: keyof typeof LogLevel = 'INFO', serviceName?: string) {
     this.level = LogLevel[level];
+    this.serviceName = serviceName || '';
   }
 
   error(message: string, ...args: any[]): void {
@@ -53,8 +55,11 @@ export class Logger {
     if (level <= this.level) {
       const timestamp = new Date().toISOString();
       const coloredLevel = this.getColoredLevel(level);
+      const serviceNamePrefix = this.serviceName
+        ? `[${this.serviceName}] `
+        : '';
       console.log(
-        `${chalk.gray(`[${timestamp}]`)} ${coloredLevel}: ${message}`,
+        `${chalk.gray(`[${timestamp}]`)} ${serviceNamePrefix}${coloredLevel}: ${message}`,
         ...args,
       );
     }
