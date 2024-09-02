@@ -34,18 +34,5 @@
       "AMZ_REGION"
     ],
     "internal_name": "instant_database"
-  },
-  {
-    "name": "coolMang",
-    "id": "f85b5e76-c60b-4ecd-89d4-06facb079c7b",
-    "description": "it's cool",
-    "requiredKeys": [
-      "AMZ_ID",
-      "AMZ_SEC",
-      "AMZ_REGION"
-    ],
-    "fileLocation": "templates/services/serverless/coolmang",
-    "internal_name": "coolmang",
-    "deploy_file_location": "services/humidity/deploy/CoolmangService.ts"
   }
 ]

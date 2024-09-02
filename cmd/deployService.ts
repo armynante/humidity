@@ -22,7 +22,7 @@ const handleCreateTemplate = async () => {
   const createSpinner = ora('Creating template...');
   try {
     const templateName = await input({
-      message: 'Enter a name for the new template:',
+      message: 'Enter a name for the new template like "My Cool Service":',
       validate: (name: string) => name.length > 0 || 'Please enter a name',
     });
 
@@ -32,8 +32,8 @@ const handleCreateTemplate = async () => {
         description.length > 0 || 'Please enter a description',
     });
 
-    // Default to the template name to snake case
-    const shortNameDefault = templateName.replace(/ /g, '_').toLowerCase();
+    // Default to the template name to dash case
+    const shortNameDefault = templateName.replace(/ /g, '-').toLowerCase();
 
     // Validate the short name to make sure it only contains letters, numbers, and underscores, and is in snake case and not empty
     const shortName = await input({
@@ -43,7 +43,7 @@ const handleCreateTemplate = async () => {
         if (name.length === 0) {
           return 'Please enter a name';
         }
-        if (!name.match(/^[a-z0-9_]+$/)) {
+        if (!name.match(/^[a-z0-9-]+$/)) {
           return 'Please enter a name in snake case';
         }
         return true;

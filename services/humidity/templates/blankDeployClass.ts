@@ -1,23 +1,18 @@
 // This is a blank deploy class that can be used to create a new deploy class
-// the serviceName is the name of the service that is being deployed and should be formatted as a camel case string
+// the serviceShortName is the name of the service that is being deployed and should be formatted as a snake case
 // the payload is the code that is being deployed
-export const createDeployTemplate = (serviceName: string) => {
+export const createDeployTemplate = (serviceShortName: string) => {
   // Capitalize the first letter of the service name
-  //check if name is camel case
-  const isCamelCase = /^[a-z][a-zA-Z0-9]*$/.test(serviceName);
-  if (!isCamelCase) {
-    throw new Error('Service name must be in camel case');
-  }
   const upcasedServiceName =
-    serviceName.charAt(0).toUpperCase() + serviceName.slice(1) + 'Service';
-  const snakedName = serviceName
-    .replace(/([a-z])([A-Z])/g, '$1_$2')
-    .toLowerCase();
-  const displayName = serviceName
+    serviceShortName
+      .split('-')
+      .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
+      .join('') + 'Service';
+  const displayName = serviceShortName
     .replace(/([a-z])([A-Z])/g, '$1 $2')
     .split(' ')
     .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
-    .join(' ');
+    .join('');
 
   const payload = `
   import { randomUUID } from 'crypto';
@@ -37,8 +32,8 @@ export const createDeployTemplate = (serviceName: string) => {
     }
 
     async up(serviceName: string): Promise<void> {
-      const uploadSpinner = ora('Deploying ${serviceName}...').start();
-      this.logger.info('Deploying ${serviceName}');
+      const uploadSpinner = ora('Deploying ${displayName}...').start();
+      this.logger.info('Deploying ${displayName}');
 
       if (!this.payload) {
         uploadSpinner.fail('No payload provided');
@@ -74,17 +69,17 @@ export const createDeployTemplate = (serviceName: string) => {
           config: {
             ...lambdaConfig,
             // Add the bucket name to the config if needed
-            bucketName: internalName,
+            //bucketName: internalName,
           },
           url: lambdaConfig.url,
           id: uuid,
           apiId: lambdaConfig.apiId,
           created: new Date().toISOString(),
           updated: new Date().toISOString(),
-          serviceType: '${snakedName}',
+          serviceType: '${serviceShortName}',
         };
       } catch (error) {
-        this.logger.error('Error deploying ${serviceName}', error);
+        this.logger.error('Error deploying ${serviceShortName}', error);
       }
     }
   };
@@ -94,7 +89,7 @@ export const createDeployTemplate = (serviceName: string) => {
     payload,
     displayName,
     className: upcasedServiceName,
-    serviceTypeName: snakedName,
+    serviceTypeName: serviceShortName,
     fileName: upcasedServiceName + '.ts',
   };
 };
