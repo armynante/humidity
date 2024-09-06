@@ -7,10 +7,12 @@ import ora from 'ora';
 import { projectTable } from '../helpers/transformers.js';
 import { runCommand } from '../helpers/io.js';
 import fs from 'node:fs/promises';
-import { copyEsLintFiles, copyPrettierFiles, copyTsStarterFiles, } from '../helpers/newProject.js';
+import { copyTsStarterFiles, } from '../helpers/newProject.js';
 import GitHub from '../helpers/github.js';
 import { ConfigInstance, logger } from './main.js';
 import { Logger } from '../helpers/logger.js';
+import dotenv from 'dotenv';
+dotenv.config();
 const createProject = async () => {
     try {
         const projectDetails = await gatherProjectDetails();
@@ -111,11 +113,11 @@ const setupProjectFiles = async (details) => {
     const fileSpinner = ora('Setting up project files').start();
     try {
         if (details.projectType === 'ts_express') {
-            await copyTsStarterFiles(details);
+            await copyTsStarterFiles(details, ['Dockerfile', 'nodemon.json', 'src/index.ts', 'tsconfig.json', 'package.json', '.gitignore']);
             if (details.prettier)
-                await copyPrettierFiles(details);
+                await copyTsStarterFiles(details, ['.prettierrc', '.prettierignore']);
             if (details.eslint)
-                await copyEsLintFiles(details);
+                await copyTsStarterFiles(details, ['.eslintignore', 'eslint.config.js']);
             if (details.buildTool) {
                 fileSpinner.text = 'Building project';
                 await runCommand(details.buildTool, ['install'], details.projectPath);
@@ -155,6 +157,8 @@ const setupVersionControl = async (details, newProject) => {
                 }
                 const GH_USERNAME = process.env.GH_USERNAME;
                 const GH_TOKEN = process.env.GH_TOKEN;
+                logger.extInfo(`GH_USERNAME: ${GH_USERNAME}`);
+                logger.extInfo(`GH_TOKEN: ${GH_TOKEN}`);
                 const GH = new GitHub(GH_TOKEN, GH_USERNAME);
                 const { data: repo } = await GH.createRepo(details.name);
                 await ConfigInstance.updateProject(newProject.id, {

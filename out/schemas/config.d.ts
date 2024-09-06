@@ -217,6 +217,15 @@ export declare const ConfigSchema: z.ZodObject<{
         deploy_file_location: string;
     }>, "many">;
 }, "strip", z.ZodTypeAny, {
+    templates: {
+        name: string;
+        description: string;
+        id: `${string}-${string}-${string}-${string}-${string}`;
+        internal_name: string;
+        requiredKeys: string[];
+        fileLocation: string;
+        deploy_file_location: string;
+    }[];
     projects: {
         name: string;
         updated: string | Date;
@@ -241,17 +250,17 @@ export declare const ConfigSchema: z.ZodObject<{
         internal_name: string;
         serviceType: string;
         apiId: string;
-    }[];
-    templates: {
-        name: string;
-        description: string;
-        id: `${string}-${string}-${string}-${string}-${string}`;
-        internal_name: string;
-        requiredKeys: string[];
-        fileLocation: string;
-        deploy_file_location: string;
     }[];
 }, {
+    templates: {
+        name: string;
+        description: string;
+        id: string;
+        internal_name: string;
+        requiredKeys: string[];
+        fileLocation: string;
+        deploy_file_location: string;
+    }[];
     projects: {
         name: string;
         updated: string | Date;
@@ -276,15 +285,6 @@ export declare const ConfigSchema: z.ZodObject<{
         internal_name: string;
         serviceType: string;
         apiId: string;
-    }[];
-    templates: {
-        name: string;
-        description: string;
-        id: string;
-        internal_name: string;
-        requiredKeys: string[];
-        fileLocation: string;
-        deploy_file_location: string;
     }[];
 }>;
 export type Project = z.infer<typeof ProjectSchema>;
