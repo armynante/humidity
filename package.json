@@ -75,7 +75,7 @@
     "zod": "^3.23.8"
   },
   "files": [
-    "templates/sampleTSProject/**/*"
+    "templates/sampleTSProject/.gitignore",
   ],
   "version": "0.0.9"
 }
