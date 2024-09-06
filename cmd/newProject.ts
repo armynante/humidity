@@ -212,8 +212,6 @@ const setupVersionControl = async (
         }
         const GH_USERNAME = process.env.GH_USERNAME as string;
         const GH_TOKEN = process.env.GH_TOKEN as string;
-        logger.extInfo(`GH_USERNAME: ${GH_USERNAME}`);
-        logger.extInfo(`GH_TOKEN: ${GH_TOKEN}`);
         const GH = new GitHub(GH_TOKEN, GH_USERNAME);
         const { data: repo } = await GH.createRepo(details.name);
         await ConfigInstance.updateProject(newProject.id, {
