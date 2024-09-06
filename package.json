@@ -1,7 +1,9 @@
 {
   "name": "humidity-cli",
   "module": "out/index.js",
-  "bin": "out/index.js",
+  "bin": {
+    "humidity-cli": "out/index.js"
+  },
   "type": "module",
   "scripts": {
     "lint": "eslint .",
