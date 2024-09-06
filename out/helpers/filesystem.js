@@ -60,4 +60,7 @@ export class FileSystemWrapper {
     basename(filePath) {
         return path.basename(filePath);
     }
+    async fileURLToPath(fileURL) {
+        return await import('url').then(({ fileURLToPath }) => fileURLToPath(fileURL));
+    }
 }

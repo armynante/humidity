@@ -43,9 +43,26 @@ export class ConfigService {
     }
     // load templates
     async loadTemplates() {
-        const templateFile = await this.fs.readFile(path.join(__dirname, 'templates.json'), 'utf-8');
-        this.logger.extInfo('Templates loaded');
-        return JSON.parse(templateFile);
+        const currentFileURL = import.meta.url;
+        const currentFilePath = await this.fs.fileURLToPath(currentFileURL);
+        const templatesFilePath = this.fs.joinPath(this.fs.dirname(currentFilePath), 'templates.json');
+        try {
+            const templateFile = await this.fs.readFile(templatesFilePath, 'utf-8');
+            this.logger.extInfo('Templates loaded');
+            return JSON.parse(templateFile);
+        }
+        catch (error) {
+            // @ts-ignore
+            if (error.code === 'ENOENT') {
+                // If the file doesn't exist, create it with an empty array
+                await this.fs.writeFile(templatesFilePath, JSON.stringify([], null, 2));
+                this.logger.extInfo('Templates file created');
+                return [];
+            }
+            else {
+                throw error;
+            }
+        }
     }
     async initializeConfig() {
         const templates = await this.loadTemplates();
@@ -220,10 +237,10 @@ export class ConfigService {
             throw new Error('Config does not exist');
         }
         this.config.templates.push(template);
-        // Update the template.json file with the new template
-        const templates = await this.loadTemplates();
-        templates.push(template);
-        await this.fs.writeFile(path.join(__dirname, 'templates.json'), JSON.stringify(templates, null, 2));
+        const currentFileURL = import.meta.url;
+        const currentFilePath = await this.fs.fileURLToPath(currentFileURL);
+        const templatesFilePath = this.fs.joinPath(this.fs.dirname(currentFilePath), 'templates.json');
+        await this.fs.writeFile(templatesFilePath, JSON.stringify(this.config.templates, null, 2));
         await this.saveConfig();
     }
     async removeTemplate(templateId) {
@@ -232,10 +249,10 @@ export class ConfigService {
             throw new Error('Config does not exist');
         }
         this.config.templates = this.config.templates.filter((t) => t.id !== templateId);
-        // remove the template from the template.json file
-        const templates = await this.loadTemplates();
-        const updatedTemplates = templates.filter((t) => t.id !== templateId);
-        await this.fs.writeFile(path.join(__dirname, 'templates.json'), JSON.stringify(updatedTemplates, null, 2));
+        const currentFileURL = import.meta.url;
+        const currentFilePath = await this.fs.fileURLToPath(currentFileURL);
+        const templatesFilePath = this.fs.joinPath(this.fs.dirname(currentFilePath), 'templates.json');
+        await this.fs.writeFile(templatesFilePath, JSON.stringify(this.config.templates, null, 2));
         await this.saveConfig();
     }
     async addService(service) {

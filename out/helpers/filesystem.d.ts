@@ -17,4 +17,5 @@ export declare class FileSystemWrapper {
     joinPath(...pathSegments: string[]): string;
     dirname(filePath: string): string;
     basename(filePath: string): string;
+    fileURLToPath(fileURL: string): Promise<string>;
 }
