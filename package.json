@@ -74,6 +74,8 @@
     "sqlite3": "^5.1.7",
     "zod": "^3.23.8"
   },
-  "files": ["templates/sampleTSProject/**/*"],
-  "version": "0.0.8"
+  "files": [
+    "templates/sampleTSProject/**/*"
+  ],
+  "version": "0.0.9"
 }
