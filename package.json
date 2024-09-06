@@ -1,9 +1,7 @@
 {
   "name": "humidity-cli",
-  "module": "out/index.js",
-  "bin": {
-    "humidity-cli": "out/index.js"
-  },
+  "main": "out/index.js",
+  "bin": "out/index.js",
   "type": "module",
   "scripts": {
     "lint": "eslint .",
@@ -76,5 +74,5 @@
     "sqlite3": "^5.1.7",
     "zod": "^3.23.8"
   },
-  "version": "0.0.4"
+  "version": "0.0.3"
 }

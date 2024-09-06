@@ -1,3 +1,4 @@
+#!/usr/bin/env node
 import { exit } from 'node:process';
 import { main } from './cmd/main.js';
 
