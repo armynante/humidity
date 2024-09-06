@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import type { UUID } from 'crypto';
+import type { UUID } from 'node:crypto';
 
 const uuidRegex =
   /^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[4][0-9a-fA-F]{3}-[89AB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}$/i;

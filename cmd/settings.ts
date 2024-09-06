@@ -1,8 +1,8 @@
 import { select, confirm, input, password, checkbox } from '@inquirer/prompts';
 import { ConfigService } from '../services/humidity/config/ConfigService';
+
 import type { Config } from '../types/config.d.ts';
-// @ts-ignore
-import { EnvKeys } from '../types/config.d.ts';
+import { EnvKeys } from '../types/enums';
 
 const envKeyDescriptions: Record<EnvKeys, string> = {
   [EnvKeys.GH_USERNAME]: 'GitHub Username',

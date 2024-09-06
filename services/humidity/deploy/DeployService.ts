@@ -1,16 +1,13 @@
-import {
-  EnvKeys,
-  type RequiredEnvs,
-  type Service,
-  // @ts-ignore
-} from '../../../types/config.d.ts';
-import { AWSLambdaClient } from '../../serverless/AWSLambdaClient/AWSLambdaClient';
-import { type CreateFunctionConfig } from '../../../types/services';
+import type { RequiredEnvs, Service } from '../../../types/config';
 import { ConfigInstance } from '../../../cmd/main';
-import { InstantDatabaseService } from './InstantDatabase.ts';
+import { InstantDatabaseService } from './InstantDatabase';
 import { FileSystem } from '../../../cmd/main';
-import { AwsUploadService } from './AWSUpload.ts';
+import { AwsUploadService } from './AWSUpload';
+import { Logger } from '../../../helpers/logger';
 export class DeployService {
+  // Logger for the deployment service
+  private logger = new Logger('EXT_DEBUG', 'DeployService');
+
   // Look up the service in the config and returns the template
   findServiceTemplateByInternalName = (serviceName: string | undefined) => {
     if (!serviceName) {
@@ -36,8 +33,13 @@ export class DeployService {
 
     // Check if the required environment variables are set
     const validEnvs = ConfigInstance.checkEnvVars(requiredEnvVars);
-
-    if (!validEnvs) {
+    this.logger.extInfo('Checking environment variables...');
+    if (validEnvs !== true) {
+      this.logger.error('Missing required environment variables');
+      this.logger.error(
+        'The following environment variables are required: ' +
+          requiredEnvVars.join(', '),
+      );
       throw new Error('Missing required environment variables');
     }
 

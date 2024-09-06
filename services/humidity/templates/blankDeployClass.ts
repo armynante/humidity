@@ -15,7 +15,7 @@ export const createDeployTemplate = (serviceShortName: string) => {
     .join('');
 
   const payload = `
-  import { randomUUID } from 'crypto';
+  import { randomUUID } from 'node:crypto';
   import { ConfigInstance } from '../../../cmd/main';
   import type { Service } from '../../../types/config';
   import ora from 'ora';

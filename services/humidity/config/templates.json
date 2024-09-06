@@ -4,35 +4,17 @@
     "id": "981c3345-c5c9-4cbe-ac82-2f38d7d96eb7",
     "description": "Upload files to S3",
     "fileLocation": "templates/services/serverless/fileUploader/bundle.js",
-    "requiredKeys": [
-      "AMZ_ID",
-      "AMZ_SEC",
-      "AMZ_REGION"
-    ],
-    "internal_name": "aws_upload"
-  },
-  {
-    "name": "DigitalOcean Spaces File upload service",
-    "id": "20508c1e-e7c7-48b4-9a35-c8a3ac2b71da",
-    "description": "Upload files to DigitalOcean Spaces",
-    "fileLocation": "services/storage/DigitalOcean/DOBucketClient.ts",
-    "requiredKeys": [
-      "DO_SPACES_ACCESS_KEY",
-      "DO_SPACES_SECRET_KEY",
-      "DO_SPACES_REGION"
-    ],
-    "internal_name": "do_upload"
+    "requiredKeys": ["AMZ_ID", "AMZ_SEC", "AMZ_REGION"],
+    "internal_name": "aws_upload",
+    "deploy_file_location": "templates/services/serverless/fileUploader/bundle.js"
   },
   {
     "name": "Instant Database",
     "id": "20508c1e-e7c7-48b4-9a35-c8a3ac2b71da",
     "description": "A sqLite database that is deployed to AWS Lambda",
     "fileLocation": "templates/services/serverless/instantDatabase/bundle.js",
-    "requiredKeys": [
-      "AMZ_ID",
-      "AMZ_SEC",
-      "AMZ_REGION"
-    ],
-    "internal_name": "instant_database"
+    "requiredKeys": ["AMZ_ID", "AMZ_SEC", "AMZ_REGION"],
+    "internal_name": "instant_database",
+    "deploy_file_location": "templates/services/serverless/database/bundle.js"
   }
 ]

@@ -1,10 +1,9 @@
-import { homedir } from 'os';
 import path from 'path';
 import { FileSystemWrapper } from '../../../helpers/filesystem';
 import { Logger } from '../../../helpers/logger';
 import type { TemplateType } from '../../../types/services';
 import { randomUUID } from 'node:crypto';
-import type { EnvKeys } from '../../../types/config';
+import type { EnvKeys } from '../../../types/enums';
 import { ConfigInstance } from '../../../cmd/main';
 import { createDeployTemplate } from './blankDeployClass';
 
@@ -156,12 +155,21 @@ export class TemplateService {
         this.logger.info(
           `package.json updated with esbuild command for "${templateName}".`,
         );
+        packageJson.scripts[`dev:${templateName}`] =
+          `bun run templates/services/serverless/${templateName}/src/index.ts`;
+        this.logger.info(
+          `package.json updated with dev command for "${templateName}".`,
+        );
       } else if (action === 'remove') {
         // Remove the esbuild command
         if (packageJson.scripts[`bundle:${templateName}`]) {
           delete packageJson.scripts[`bundle:${templateName}`];
           this.logger.info(
             `Esbuild command for "${templateName}" removed from package.json.`,
+          );
+          delete packageJson.scripts[`dev:${templateName}`];
+          this.logger.info(
+            `Dev command for "${templateName}" removed from package.json.`,
           );
         } else {
           this.logger.warn(

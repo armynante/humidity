@@ -1,7 +1,4 @@
-// Take a template and deploy it to a service
-
-import { type ServiceType, type TemplateType } from '../types/services';
-import { EnvKeys, type RequiredEnvs } from '../types/config';
+import type { TemplateType } from '../types/services';
 import ora from 'ora';
 import { exit } from 'node:process';
 import { select, input, checkbox } from '@inquirer/prompts';
@@ -11,7 +8,7 @@ import { DeployInstance, TemplateInstance, ConfigInstance } from './main';
 import { listEnvs } from '../helpers/config';
 
 const MENU_CHOICES: { name: string; value: string }[] = [
-  { name: 'DeployInstance a service from a template', value: 'upload' },
+  { name: 'Deploy a service using a template', value: 'upload' },
   { name: 'List deployed services', value: 'list' },
   { name: 'Create a new template', value: 'create_template' },
   { name: 'Destroy a template', value: 'destroy_template' },
@@ -50,13 +47,13 @@ const handleCreateTemplate = async () => {
       },
     });
 
-    const templateKeyOptions: EnvKeys[] = listEnvs();
+    const templateKeyOptions = listEnvs();
 
     const templateKeys = await checkbox({
       message: 'Select the environment variables for the template:',
       choices: templateKeyOptions.map((key) => ({
-        name: key,
-        value: key,
+        name: key as string,
+        value: key as string,
       })),
     });
 
@@ -65,7 +62,8 @@ const handleCreateTemplate = async () => {
       templateName,
       templateDescription,
       shortName,
-      Array.isArray(templateKeys) ? templateKeys : [templateKeys], // Ensure templateKeys is an array
+      // @ts-ignore
+      templateKeys,
     );
     createSpinner.succeed(`Template "${templateName}" created successfully`);
   } catch (error) {
@@ -187,7 +185,6 @@ const ACTION_HANDLERS = {
         }
       }
     } catch (error) {
-      console.error(error);
       exit(1);
       return;
     }

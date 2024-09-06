@@ -46,21 +46,6 @@ export interface Service {
   serviceType: ServiceType;
 }
 
-// ... existing code ...
-
-export enum EnvKeys {
-  GH_USERNAME = 'GH_USERNAME',
-  GH_TOKEN = 'GH_TOKEN',
-  DO_REGISTRY_NAME = 'DO_REGISTRY_NAME',
-  DO_API_TOKEN = 'DO_API_TOKEN',
-  DO_SPACES_REGION = 'DO_SPACES_REGION',
-  DO_SPACES_ACCESS_KEY = 'DO_SPACES_ACCESS_KEY',
-  DO_SPACES_SECRET_KEY = 'DO_SPACES_SECRET_KEY',
-  AMZ_ID = 'AMZ_ID',
-  AMZ_SEC = 'AMZ_SEC',
-  AMZ_REGION = 'AMZ_REGION',
-}
-
 export interface RequiredEnvs {
   [EnvKeys.GH_USERNAME]?: string;
   [EnvKeys.GH_TOKEN]?: string;
@@ -74,26 +59,13 @@ export interface RequiredEnvs {
   [EnvKeys.AMZ_REGION]?: string;
 }
 
-export enum EnvKeys {
-  GH_USERNAME = 'GH_USERNAME',
-  GH_TOKEN = 'GH_TOKEN',
-  DO_REGISTRY_NAME = 'DO_REGISTRY_NAME',
-  DO_API_TOKEN = 'DO_API_TOKEN',
-  DO_SPACES_REGION = 'DO_SPACES_REGION',
-  DO_SPACES_ACCESS_KEY = 'DO_SPACES_ACCESS_KEY',
-  DO_SPACES_SECRET_KEY = 'DO_SPACES_SECRET_KEY',
-  AMZ_ID = 'AMZ_ID',
-  AMZ_SEC = 'AMZ_SEC',
-  AMZ_REGION = 'AMZ_REGION',
-}
-
 export interface GHSecret {
   repo: string;
   secret_name: string;
   encrypted_value: string;
 }
 
-export type ProjectType = 'ts_express' | 'go_fiber';
+export type ProjectType = 'ts_express' | 'go_fiber' | 'exit';
 
 export interface NewProjectQuestions {
   name: string;

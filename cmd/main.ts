@@ -13,8 +13,8 @@ import { TemplateService } from '../services/humidity/templates/TemplateService'
 import { DeployService } from '../services/humidity/deploy/DeployService';
 const MENU_CHOICES: { name: string; value: ActionType }[] = [
   { name: 'Create a new project ✨', value: 'new' },
-  { name: 'Manage projects 🗂️', value: 'ls' },
-  { name: 'Manage services 🛠️', value: 'services' },
+  { name: 'Projects 🗂️', value: 'ls' },
+  { name: 'Service templates 🛠️', value: 'services' },
   { name: 'Settings 📎', value: 'settings' },
   { name: 'Exit', value: 'exit' },
 ];
@@ -35,7 +35,7 @@ const ACTION_HANDLERS: Record<ActionType, any> = {
     logger.extInfo('Listing projects...');
     await listProjects(true);
   },
-  services: async () => deploy(),
+  services: async () => await deploy(),
   test: () => console.log('Running function test...'),
   exit: () => {
     console.log('Exiting...');

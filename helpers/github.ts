@@ -13,7 +13,7 @@ export default class GitHub {
     this.client = new Octokit({ auth: this.token });
   }
 
-  async createRepo(name: string) {
+  async createRepo(name: string): Promise<any> {
     if (!this.client) {
       throw new Error('Client not initialized');
     }
@@ -27,7 +27,7 @@ export default class GitHub {
     });
   }
 
-  async delete(repo: string) {
+  async delete(repo: string): Promise<any> {
     if (!this.client) {
       throw new Error('Client not initialized');
     }
@@ -87,7 +87,7 @@ export default class GitHub {
     return [secret_encrypted, data.key_id];
   }
 
-  async uploadRepoSecret(secret: GHSecret) {
+  async uploadRepoSecret(secret: GHSecret): Promise<any> {
     if (!this.client) {
       throw new Error('Client not initialized');
     }

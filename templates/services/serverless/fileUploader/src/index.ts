@@ -1,8 +1,8 @@
 import express from 'express';
 import serverless from 'serverless-http';
-import { BucketClient } from '../../../../../services/storage/AWS/AWSBucketService.ts';
+import { BucketService } from '../../../../../services/storage/AWS/AWSBucketService';
 // @ts-ignore
-import { type BucketClientConfig } from '../../../../../types/buckets.d.ts';
+import { type BucketClientConfig } from '../../../../../types/buckets';
 import * as dotenv from 'dotenv';
 
 dotenv.config();
@@ -22,7 +22,7 @@ const clientConfig: BucketClientConfig = {
   region: AWS_REGION,
 };
 
-const bucketService = new BucketClient();
+const bucketService = new BucketService();
 
 app.use((req, res, next) => {
   res.header('Access-Control-Allow-Origin', '*');

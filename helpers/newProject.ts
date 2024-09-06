@@ -3,25 +3,25 @@ import type { NewProjectQuestions } from '../types/config';
 
 export const copyTsStarterFiles = async (p: NewProjectQuestions) => {
   const docker = await fs.readFile(
-    './templates/skeletons/sampleTSProject/Dockerfile',
+    new URL('../templates/sampleTSProject/Dockerfile', import.meta.url),
   );
   const ignore = await fs.readFile(
-    './templates/skeletons/sampleTSProject/.gitignore',
+    new URL('../templates/sampleTSProject/.gitignore', import.meta.url),
   );
   const tsconfig = await fs.readFile(
-    './templates/skeletons/sampleTSProject/tsconfig.json',
+    new URL('../templates/sampleTSProject/tsconfig.json', import.meta.url),
   );
   const editorconfig = await fs.readFile(
-    './templates/skeletons/sampleTSProject/.editorconfig',
+    new URL('../templates/sampleTSProject/.editorconfig', import.meta.url),
   );
   const nodemon = await fs.readFile(
-    './templates/skeletons/sampleTSProject/nodemon.json',
+    new URL('../templates/sampleTSProject/nodemon.json', import.meta.url),
   );
   const packageJson = await fs.readFile(
-    './templates/skeletons/sampleTSProject/package.json',
+    new URL('../templates/sampleTSProject/package.json', import.meta.url),
   );
   const packageLock = await fs.readFile(
-    './templates/skeletons/sampleTSProject/pnpm-lock.yaml',
+    new URL('../templates/sampleTSProject/pnpm-lock.yaml', import.meta.url),
   );
 
   await fs.writeFile(`${p.projectPath}/Dockerfile`, docker);
@@ -36,17 +36,17 @@ export const copyTsStarterFiles = async (p: NewProjectQuestions) => {
   await mkdir(`${p.projectPath}/src`);
   // Copy the sample src files
   const srcFile = await fs.readFile(
-    './templates/skeletons/sampleTSProject/src/index.ts',
+    new URL('../templates/sampleTSProject/src/index.ts', import.meta.url),
   );
   await fs.writeFile(`${p.projectPath}/src/index.ts`, srcFile);
 };
 
 export const copyPrettierFiles = async (p: NewProjectQuestions) => {
   const prettier = await fs.readFile(
-    './templates/skeletons/sampleTSProject/.prettierrc',
+    new URL('../templates/sampleTSProject/.prettierrc', import.meta.url),
   );
   const prettierIgnore = await fs.readFile(
-    './templates/skeletons/sampleTSProject/.prettierignore',
+    new URL('../templates/sampleTSProject/.prettierignore', import.meta.url),
   );
 
   await fs.writeFile(`${p.projectPath}/.prettierrc`, prettier);
@@ -55,10 +55,10 @@ export const copyPrettierFiles = async (p: NewProjectQuestions) => {
 
 export const copyEsLintFiles = async (p: NewProjectQuestions) => {
   const eslint = await fs.readFile(
-    './templates/skeletons/sampleTSProject/eslint.config.js',
+    new URL('../templates/sampleTSProject/eslint.config.js', import.meta.url),
   );
   const eslintignore = await fs.readFile(
-    './templates/skeletons/sampleTSProject/.eslintignore',
+    new URL('../templates/sampleTSProject/.eslintignore', import.meta.url),
   );
   await fs.writeFile(`${p.projectPath}/.eslint.config.js`, eslint);
   await fs.writeFile(`${p.projectPath}/.eslintignore`, eslintignore);

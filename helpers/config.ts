@@ -1,5 +1,4 @@
-// @ts-ignore
-import { EnvKeys } from '../types/config.d.ts';
+import { EnvKeys } from '../types/enums';
 
 // pluck a subset of envs from the the EnvKeys enum and return as an array
 export const pluckEnvs = (keys: EnvKeys[]) => {

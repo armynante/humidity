@@ -2,13 +2,12 @@ import { mkdir } from 'node:fs/promises';
 import { select, input, confirm } from '@inquirer/prompts';
 import chalk from 'chalk';
 import DigitalOceanService from '../services/compute/DigitalOceanClient/DigitalOceanClient';
-import {
-  type NewProjectQuestions,
-  type GHSecret,
-  type ProjectType,
-  EnvKeys,
-  // @ts-ignore
-} from '../types/config.d.ts';
+import type {
+  NewProjectQuestions,
+  GHSecret,
+  ProjectType,
+} from '../types/config';
+import { EnvKeys } from '../types/enums';
 import type { DoAppSpec } from '../types/do';
 import ora from 'ora';
 import { projectTable } from '../helpers/transformers';
@@ -20,7 +19,8 @@ import {
   copyTsStarterFiles,
 } from '../helpers/newProject';
 import GitHub from '../helpers/github';
-import { ConfigInstance } from './main';
+import { ConfigInstance, logger } from './main';
+import { Logger } from '../helpers/logger';
 
 interface Config {
   GH_TOKEN: string;
@@ -53,8 +53,14 @@ const gatherProjectDetails = async (): Promise<NewProjectQuestions> => {
     choices: [
       { name: 'TypeScript ExpressJS server', value: 'ts_express' },
       { name: 'Go Fiber server', value: 'go_fiber' },
+      { name: 'Exit', value: 'exit' },
     ],
   });
+
+  if (projectType === 'exit') {
+    console.log('Exiting project creation');
+    process.exit(0);
+  }
 
   let buildTool = null;
   let prettier = false;
@@ -165,6 +171,7 @@ const setupProjectFiles = async (details: NewProjectQuestions) => {
 
     fileSpinner.succeed('Project files set up successfully');
   } catch (error) {
+    logger.error('Failed to set up project files');
     fileSpinner.fail('Failed to set up project files');
     throw error;
   }
@@ -185,14 +192,16 @@ const setupVersionControl = async (
         const config = await ConfigInstance.load();
         const [validFile, missingEnvVars] =
           await ConfigInstance.validateEnvFile([
-            EnvKeys.GH_USERNAME,
-            EnvKeys.GH_TOKEN,
+            // @ts-ignore
+            EnvKeys.GH_USERNAME as string,
+            // @ts-ignore
+            EnvKeys.GH_TOKEN as string,
           ]);
 
         if (
           !validFile &&
-          missingEnvVars.includes(EnvKeys.GH_USERNAME) &&
-          missingEnvVars.includes(EnvKeys.GH_TOKEN)
+          (missingEnvVars as string[]).includes(EnvKeys.GH_USERNAME) &&
+          (missingEnvVars as string[]).includes(EnvKeys.GH_TOKEN)
         ) {
           console.log(
             chalk.yellow(
@@ -296,20 +305,18 @@ const setupCloudDeployment = async (
 
     // Check if the user has a DigitalOcean token
     const config = await ConfigInstance.load();
-    const [validFile, missingEnvVars] = await ConfigInstance.validateEnvFile([
-      EnvKeys.DO_API_TOKEN,
-      EnvKeys.DO_REGISTRY_NAME,
+    const validEnvs = ConfigInstance.checkEnvVars([
+      // @ts-ignore
+      EnvKeys.DO_API_TOKEN as string,
+      // @ts-ignore
+      EnvKeys.DO_REGISTRY_NAME as string,
     ]);
-
-    if (
-      !validFile &&
-      missingEnvVars.includes(EnvKeys.DO_API_TOKEN) &&
-      missingEnvVars.includes(EnvKeys.DO_REGISTRY_NAME)
-    ) {
-      console.log(
-        chalk.yellow(
-          'Please set the DO_API_TOKEN and DO_REGISTRY_NAME in your .env file to continue',
-        ),
+    if (validEnvs !== true) {
+      const logger = new Logger('EXT_DEBUG', 'New Project');
+      logger.error('Missing required environment variables');
+      logger.error(
+        // @ts-ignore
+        `The following environment variables are required: ${validEnvs.join(', ')}`,
       );
       return;
     }
@@ -320,6 +327,7 @@ const setupCloudDeployment = async (
 
     try {
       // Build and push Docker image
+      logger.extInfo('Building and pushing Docker image');
       await runCommand(
         'docker',
         [
@@ -330,7 +338,7 @@ const setupCloudDeployment = async (
         ],
         details.projectPath,
       );
-
+      logger.extInfo('Docker image built');
       await runCommand(
         'docker',
         [
@@ -339,7 +347,7 @@ const setupCloudDeployment = async (
         ],
         details.projectPath,
       );
-
+      logger.extInfo('Docker image pushed');
       // Create and deploy DO App
       const spec: DoAppSpec = doService.createDoAppSpec(
         details.name,
@@ -348,9 +356,11 @@ const setupCloudDeployment = async (
         details.name,
       );
       await doService.writeDoAppSpec(details.name, spec, details.projectPath);
-
+      logger.extInfo('DigitalOcean App spec written');
       const [createAppResponse, createAppError] =
         await doService.createDoApp(spec);
+      logger.extInfo('Creating DigitalOcean App');
+      logger.extInfo('DigitalOcean App created, proceeding with setup');
       if (createAppError || !createAppResponse) {
         throw new Error(`Failed to create DigitalOcean App: ${createAppError}`);
       }

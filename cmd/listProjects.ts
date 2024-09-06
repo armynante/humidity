@@ -6,7 +6,6 @@ import { rmdir } from 'node:fs/promises';
 import { buildProjectChoices, projectTable } from '../helpers/transformers';
 import process from 'node:process';
 import DigitalOceanService from '../services/compute/DigitalOceanClient/DigitalOceanClient';
-import type { ConfigService } from '../services/humidity/config/ConfigService';
 import { ConfigInstance } from './main';
 const GitHubToken = process.env.GH_TOKEN;
 
@@ -30,7 +29,6 @@ const listProjects = async (reload?: boolean) => {
 
   console.log(`Selected project: ${selectedProject}`);
   const project = await ConfigInstance.viewProject(selectedProject);
-  console.log(project);
 
   const whatToDo = await select({
     message: 'What do you want to do?',

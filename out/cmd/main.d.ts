@@ -1,0 +1,11 @@
+import { ConfigService } from '../services/humidity/config/ConfigService.js';
+import { FileSystemWrapper } from '../helpers/filesystem.js';
+import { Logger } from '../helpers/logger.js';
+import { TemplateService } from '../services/humidity/templates/TemplateService.js';
+import { DeployService } from '../services/humidity/deploy/DeployService.js';
+export declare const logger: Logger;
+export declare const FileSystem: FileSystemWrapper;
+export declare const ConfigInstance: ConfigService;
+export declare const TemplateInstance: TemplateService;
+export declare const DeployInstance: DeployService;
+export declare const main: () => Promise<void>;

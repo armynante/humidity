@@ -2,7 +2,7 @@
 
 import { homedir } from 'os';
 import path from 'path';
-import { randomUUID } from 'crypto';
+import { randomUUID } from 'node:crypto';
 import * as dotenv from 'dotenv';
 import type {
   Config,
@@ -15,6 +15,7 @@ import { ConfigSchema, RequiredEnvsSchema } from '../../../schemas/config';
 import { FileSystemWrapper } from '../../../helpers/filesystem';
 import { Logger } from '../../../helpers/logger';
 import type { TemplateType } from '../../../types/services';
+import confirm from '@inquirer/confirm';
 
 export class ConfigService {
   private config: Config | null = null;
@@ -26,7 +27,7 @@ export class ConfigService {
     this.configPath = path.join(homedir(), '.humidity', 'config.json');
     this.envPath = path.join(homedir(), '.humidity', '.env.humidity');
     this.fs = fs;
-    this.logger = logger;
+    this.logger = new Logger('EXT_DEBUG', 'ConfigService');
   }
 
   private async loadConfig(): Promise<void> {
@@ -57,13 +58,11 @@ export class ConfigService {
 
   // load templates
   private async loadTemplates(): Promise<TemplateType[]> {
-    if (!this.config) {
-      throw new Error('Config does not exist');
-    }
     const templateFile = await this.fs.readFile(
       path.join(__dirname, 'templates.json'),
       'utf-8',
     );
+    this.logger.extInfo('Templates loaded');
     return JSON.parse(templateFile);
   }
 
@@ -109,13 +108,12 @@ export class ConfigService {
       }
 
       // Create an object with the keys to check
-      const keysToCheckObject = keysToCheck.reduce(
-        (acc, key) => {
+      const keysToCheckObject: Partial<Record<keyof RequiredEnvs, boolean>> =
+        keysToCheck.reduce((acc, key) => {
+          // @ts-ignore
           acc[key] = true;
           return acc;
-        },
-        {} as Record<keyof RequiredEnvs, true>,
-      );
+        }, {});
 
       const partialSchema = RequiredEnvsSchema.pick(keysToCheckObject);
       const result = partialSchema.safeParse(envs);
@@ -134,12 +132,14 @@ export class ConfigService {
     }
   }
 
-  checkEnvVars(requiredEnvVars: (keyof RequiredEnvs)[]): boolean {
-    for (const envVar of requiredEnvVars) {
-      if (!process.env[envVar]) {
-        return false;
-      }
+  checkEnvVars(requiredEnvVars: (keyof RequiredEnvs)[]): boolean | string[] {
+    const missingVars = requiredEnvVars.filter(
+      (envVar) => !process.env[envVar],
+    );
+    if (missingVars.length > 0) {
+      return missingVars;
     }
+
     return true;
   }
 
@@ -180,7 +180,13 @@ export class ConfigService {
         await this.loadConfig();
         return [false, this.config as Config];
       }
-
+      const createNewConfig = await confirm({
+        message:
+          'Config does not exist. Create new config at ' + this.configPath,
+      });
+      if (!createNewConfig) {
+        throw new Error('A config is required to continue');
+      }
       this.logger.info('Creating new config');
       this.config = await this.initializeConfig();
       await this.fs.mkdir(path.dirname(this.configPath), { recursive: true });

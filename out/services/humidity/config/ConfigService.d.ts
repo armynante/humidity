@@ -1,0 +1,36 @@
+import type { Config, NewProjectQuestions, Project, RequiredEnvs, Service } from '../../../types/config';
+import { FileSystemWrapper } from '../../../helpers/filesystem.js';
+import { Logger } from '../../../helpers/logger.js';
+import type { TemplateType } from '../../../types/services';
+export declare class ConfigService {
+    private config;
+    private configPath;
+    private envPath;
+    private fs;
+    private logger;
+    constructor(fs: FileSystemWrapper, logger: Logger);
+    private loadConfig;
+    private loadTemplates;
+    private initializeConfig;
+    loadConfigFromEnv(envPath: string): Promise<void>;
+    load(reload?: boolean): Promise<Config>;
+    validateEnvFile(keysToCheck?: (keyof RequiredEnvs)[]): Promise<[boolean, (keyof RequiredEnvs)[]]>;
+    checkEnvVars(requiredEnvVars: (keyof RequiredEnvs)[]): boolean | string[];
+    buildEnvFile(envPath: string, envs: RequiredEnvs): Promise<void>;
+    getTemplates(): TemplateType[];
+    init(): Promise<[boolean, Config]>;
+    createNewProject(np: NewProjectQuestions): Promise<Project>;
+    updateProject(projectId: string, updates: Partial<Project>): Promise<Project>;
+    getTemplateById(templateId: string): Promise<TemplateType | null>;
+    updateConfig(updates: Partial<Config>): Promise<[Partial<Config> | null, string | null]>;
+    addTemplate(template: TemplateType): Promise<void>;
+    removeTemplate(templateId: string): Promise<void>;
+    addService(service: Service): Promise<void>;
+    listServices(): Promise<Service[]>;
+    viewService(id: string): Promise<Service>;
+    deleteService(id: string): Promise<void>;
+    listProjects(reloadConf?: boolean): Promise<Project[]>;
+    viewProject(projectId: string): Promise<Project>;
+    deleteProject(projectId: string): Promise<void>;
+    private saveConfig;
+}

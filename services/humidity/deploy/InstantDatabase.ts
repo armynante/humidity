@@ -1,5 +1,5 @@
 import fs from 'fs/promises';
-import { randomUUID } from 'crypto';
+import { randomUUID } from 'node:crypto';
 import { ConfigInstance } from '../../../cmd/main';
 import type { Service } from '../../../types/config';
 import ora from 'ora';
@@ -40,6 +40,12 @@ export class InstantDatabaseService {
       const lambdaConfig = await awsLambdaClient.createOrUpdateFunction({
         name: internalName,
         code: this.payload,
+        environment: {
+          BUCKET_NAME: internalName,
+          DB_FILE_NAME: 'db.sqlite',
+          LOCAL_DB_PATH: 'db.sqlite',
+          REGION: process.env.AWS_REGION!,
+        },
       });
 
       // Create config

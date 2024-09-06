@@ -1,4 +1,4 @@
-import type { UUID } from 'crypto';
+import type { UUID } from 'node:crypto';
 import { type FunctionConfiguration } from '@aws-sdk/client-lambda';
 
 export interface TemplateType {
