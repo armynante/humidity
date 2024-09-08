@@ -165,6 +165,8 @@ const setupVersionControl = async (details, newProject) => {
                 if (details.createGHAction) {
                     await setupGitHubAction(details, GH, repo);
                 }
+                // Add .gitignore
+                await fs.writeFile(`${details.projectPath}/.gitignore`, 'node_modules\n.env');
                 // Add remote and push
                 await runCommand('git', ['remote', 'add', 'origin', repo.html_url], details.projectPath);
                 await runCommand('git', ['add', '.'], details.projectPath);

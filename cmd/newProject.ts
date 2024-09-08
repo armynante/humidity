@@ -222,6 +222,9 @@ const setupVersionControl = async (
           await setupGitHubAction(details, GH, repo);
         }
 
+        // Add .gitignore
+        await fs.writeFile(`${details.projectPath}/.gitignore`, 'node_modules\n.env');
+
         // Add remote and push
         await runCommand(
           'git',
