@@ -2,7 +2,10 @@
 
 ![image](/humid.gif)
 
-Humidity is a command-line interface (CLI) tool that simplifies the process of creating and deploying new projects. It provides a streamlined workflow for setting up project structure, version control, and cloud deployment.
+Humidity is a command-line interface (CLI) tool that simplifies the process of creating and deploying new projects. It provides a streamlined workflow for setting up project structure, version control, and cloud deployment. In addition to project creation, Humidity also allows you to quickly create new services for common application components like file storage, queues, and caching.
+
+This was designed as a proof of concept for a component library for a service architecture platform.
+
 
 ## Features
 
@@ -10,6 +13,13 @@ Humidity is a command-line interface (CLI) tool that simplifies the process of c
 - Instantly create new services for common application components like file storage, queues, and caching
 - Tear down projects and services with a single command so your dead projects don't cost you money
 - Template support for quickly creating new projects and services that can be used as building blocks
+
+## Roadmap
+
+- [ ] Add support for AWS EC2
+- [ ] Build out templates for other frameworks and languages
+- [ ] Add support for more CI/CD platforms
+- [ ] Add more services for common application components like message brokers, task schedulers, databases, etc.
 
 
 ## Prerequisites
@@ -20,10 +30,11 @@ Before using Humidity CLI, ensure you have the following:
 - Docker installed and running
 - GitHub account and personal access token
 - DigitalOcean account and API token
+- AWS tokens for for deploying services as Lambda functions
 
 ## Installation
 
-1. Clone the repository:
+1. Install the CLI:
    ```
    npm install -g humidity-cli
    ```
