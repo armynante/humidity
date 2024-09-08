@@ -113,7 +113,7 @@ const setupProjectFiles = async (details) => {
     const fileSpinner = ora('Setting up project files').start();
     try {
         if (details.projectType === 'ts_express') {
-            await copyTsStarterFiles(details, ['Dockerfile', 'nodemon.json', 'src/index.ts', 'tsconfig.json', 'package.json', '.gitignore']);
+            await copyTsStarterFiles(details, ['Dockerfile', 'nodemon.json', 'src/index.ts', 'tsconfig.json', 'package.json']);
             if (details.prettier)
                 await copyTsStarterFiles(details, ['.prettierrc', '.prettierignore']);
             if (details.eslint)
