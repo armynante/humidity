@@ -74,8 +74,5 @@
     "sqlite3": "^5.1.7",
     "zod": "^3.23.8"
   },
-  "files": [
-    "templates/sampleTSProject/.gitignore"
-  ],
   "version": "0.0.10"
 }
